@@ -10,3 +10,4 @@ from .unet import main as train_unet
 from .rnet import main as train_rnet
 from .rfi_net import main as train_rfi_net
 from .resnet import main as train_resnet
+from .cnn_rfi_sun import main as train_cnn_rfi_sun

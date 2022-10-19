@@ -1,3 +1,8 @@
+"""
+Load LOFAR data and evaluate NLN.
+Loads trained model from checkpoint weights.
+Infers training data to use as nearest neighbours for test data.
+"""
 import tensorflow as tf
 import numpy as np
 import os 
@@ -12,6 +17,7 @@ import time
 
 from inference import infer, get_error
 from data import *
+from utils import reconstruct
 from utils.metrics import *
 from models import Encoder,Autoencoder, Discriminator_x
 
@@ -210,6 +216,8 @@ def find_best(models,seed):
     for model_type in models:
         filename = 'outputs/{}_{}_{}.csv'.format(args.data,model_type,seed)
         d = np.load(filename, allow_pickle=True)
+        # There is no detection column in results_HERA_None.csv
+        # So this .csv must be generated differently
         df = pd.DataFrame(columns = ['class', 'neighbour', 'detection'])
         for key in d.keys():
             df_temp = pd.DataFrame(d[key], columns =  ['class', 'neighbour', 'detection'])
@@ -219,8 +227,6 @@ def find_best(models,seed):
         df_group = df.groupby(['neighbour']).agg({'detection':'mean'}).reset_index()
 
         results[model_type] = [df_group.detection.max()]
-
-
     print(results)
                 
 

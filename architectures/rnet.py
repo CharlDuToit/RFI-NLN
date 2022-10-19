@@ -15,12 +15,19 @@ from inference import infer
 
 optimizer = tf.keras.optimizers.Adam()
 
+"""
+    14 Deep Learning improves identification of Radio Frequency Interference 2020
+    Alireza Vafaei Sadr, Bruce A. Bassett3, Nadeem Oozeer, Yabebal Fantaye and Chris Finlay
+"""
+
 @tf.function
 def train_step(model, x, y):
     """Executes one training step and returns the loss.
 
     This function computes the loss and gradients, and uses the latter to
     update the model's parameters.
+
+    Authors used mse(mean squared error), Mesarcick used bce(binary cross entropy)
     """
     with tf.GradientTape() as tape:
         x_hat = model(x,training=True)

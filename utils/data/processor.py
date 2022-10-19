@@ -13,6 +13,8 @@ def process(data,per_image=True):
         per_image (bool) determines if data is processed on a per image basis
 
     """
+    # Charl: output.astype('float32') uses more than 33GB RAM for LOFAR, which kills the execution on my machine.
+    # data type is almost always already float32, so bypass this conversion
     output = copy.deepcopy(data)
     if per_image:
         output = output.astype('float32')
@@ -23,7 +25,8 @@ def process(data,per_image=True):
     else:
         mi, ma = np.min(data), np.max(data)
         output = (data - mi)/(ma -mi)
-        output = output.astype('float32')
+        if not (output.dtype == np.dtype('float64')):
+            output = output.astype('float32')
     return output
 
 def resize(data, dim):

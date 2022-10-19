@@ -21,7 +21,7 @@ def ae_loss(x,x_hat):
     return mse(x,x_hat)
 
 def discriminator_loss(real_output, fake_output,loss_weight):
-    real_loss =  mse(tf.ones_like(real_output), real_output)
+    real_loss =  mse(tf.ones_like(real_output), real_output) # so all latent variables strive to a value of 1 if real?
     fake_loss =  mse(tf.zeros_like(fake_output), fake_output)
     total_loss = real_loss + fake_loss
     return loss_weight * total_loss

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 echo "Logging for run_lofar.sh at time: $(date)." >> log.log
 
 limit=None
@@ -14,7 +14,7 @@ for model in DAE RFI_NET UNET RNET
 do
 		for repeat in 1
 		do
-		python -u main.py -model $model\
+		python3 -u main.py -model $model\
 						  -limit $limit \
 						  -anomaly_class rfi\
 						  -rfi None\
@@ -31,7 +31,7 @@ do
 						  -patch_stride_x $patch \
 						  -patch_stride_y $patch \
 						  -data LOFAR\
-						  -data_path /data/mmesarcik/LOFAR/uncompressed/\
+						  -data_path /home/ee487519/DatasetsAndConfig/Given/43_Mesarcik_2022/ \
 						  -neighbors 20\
 						  -algorithm knn\
 						  -seed $d$seed | tee -a lofar.log 

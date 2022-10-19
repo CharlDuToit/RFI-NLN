@@ -1,3 +1,8 @@
+"""
+Figure 4
+Figure 3
+"""
+
 import pandas as pd
 from matplotlib import pyplot as plt
 import numpy as np
@@ -10,7 +15,9 @@ def swap_index(df,i0,i1):
     df.iloc[i1] = temp
     return df
 
+"""Figure 4"""
 #df = pd.read_csv('outputs/results_HERA_05-01-2022-01-57_860ccb.csv').iloc[:60]
+# Out of distribution OOD
 df = pd.read_csv('outputs/results_HERA_OOD_Final.csv')
 df = df.groupby(['Model','Patch_Size','Neighbour','OOD_RFI'],as_index=False).agg({'AUROC_TRUE':['mean','std'],
                                                                                   'AUPRC_TRUE':['mean','std'],
@@ -84,7 +91,7 @@ plt.savefig('/tmp/OOD',dpi=300)
 
 ##########
 # Threhsoldls
-#
+# Figure 3
 #######
 
 df = pd.read_csv('outputs/results_HERA_Thresholds_Final.csv')

@@ -3,6 +3,7 @@ import numpy as np
 from .defaults import sizes
 from model_config import *
 
+# No references to get_patched_dataset
 def get_patched_dataset(train_images, 
                         train_labels, 
                         test_images, 

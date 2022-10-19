@@ -1,5 +1,5 @@
 import numpy as np
-from sklearn.model_selection import train_test_split
+#from sklearn.model_selection import train_test_split
 
 
 rfi_models = ['rfi_stations', 'rfi_dtv', 'rfi_impulse', 'rfi_scatter']

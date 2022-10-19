@@ -1,4 +1,8 @@
-from matplotlib import pyplot as plt 
+"""
+Figure 7
+"""
+
+from matplotlib import pyplot as plt
 import pandas as pd
 import numpy as np
 

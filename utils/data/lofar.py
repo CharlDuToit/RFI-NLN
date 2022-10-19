@@ -26,10 +26,21 @@ def get_lofar_data(args, num_baselines=400):
         args (Namespace): args from utils.cmd_args 
         num_baselines (int): number of baselines to sample 
     """
-    if os.path.exists(os.path.join(args.data_path,'LOFAR_Full_RFI_dataset.pkl')):
-        print(os.path.join(args.data_path,'LOFAR_Full_RFI_dataset.pkl') + ' Loading')
-        with open('{}/LOFAR_Full_RFI_dataset.pkl'.format(args.data_path),'rb') as f:
-            return  pickle.load(f)
+    full_file = file = 'LOFAR_Full_RFI_dataset.pkl'
+    if args.lofar_subset is None or args.lofar_subset == 'full':
+        #full = True
+        file = full_file
+    if args.lofar_subset == 'L629174':
+        file = 'L629174_RFI_dataset.pkl'
+    if args.lofar_subset == 'L631961':
+        file = 'L631961_RFI_dataset.pkl'
+
+    if os.path.exists(os.path.join(args.data_path,file)):
+        print(os.path.join(args.data_path,file) + ' Loading')
+        with open('{}/{}'.format(args.data_path, file),'rb') as f:
+            #p = pickle.load(f)
+            #return p
+            return pickle.load(f)
     else:
-        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), 
-                                os.path.join(args.data_path,'LOFAR_Full_RFI_dataset.pkl'))
+        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT),
+                                os.path.join(args.data_path,file))

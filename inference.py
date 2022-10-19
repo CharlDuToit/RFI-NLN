@@ -1,5 +1,6 @@
 from models import *
 import tensorflow as tf
+import numpy as np
 from model_config import BATCH_SIZE 
 
 
@@ -19,8 +20,20 @@ def infer(model, data, args, arch):
         np.array
 
     """
-    data_tensor = tf.data.Dataset.from_tensor_slices(data).batch(BATCH_SIZE)
+    if arch=='CNN_RFI_SUN':
+        input_shape = data.shape
+        data_tensor = tf.data.Dataset.from_tensor_slices(
+            data.astype('float32').reshape((-1, 1, 1, 2)).transpose(0, 1, 3, 2)
+        ).batch(BATCH_SIZE)
+        output = np.empty((len(data_tensor), 2), dtype=np.float32) #2 output channels
+        strt, fnnsh = 0, BATCH_SIZE
+        for batch in data_tensor:
+            output[strt:fnnsh,...] = model(batch,training=False).numpy()
+            strt = fnnsh
+            fnnsh +=BATCH_SIZE
+        return output.transpose(0,1,3,2).reshape(input_shape)[...,0] # [...,:] to remove channel
 
+    data_tensor = tf.data.Dataset.from_tensor_slices(data).batch(BATCH_SIZE)
     if arch =='AE' or arch == 'encoder' or arch == 'DKNN':
         if arch=='encoder':
             output = np.empty([len(data), args.latent_dim],np.float32)

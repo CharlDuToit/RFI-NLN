@@ -34,10 +34,10 @@ def load_hera(args):
         train_masks = np.expand_dims(train_masks,axis=-1) 
 
     _max = np.mean(test_data[np.invert(test_masks)])+4*np.std(test_data[np.invert(test_masks)])
-    _min =  np.absolute(np.mean(test_data[np.invert(test_masks)]) - np.std(test_data[np.invert(test_masks)]))
+    _min = np.absolute(np.mean(test_data[np.invert(test_masks)]) - np.std(test_data[np.invert(test_masks)]))
     test_data = np.clip(test_data, _min, _max)
     test_data = np.log(test_data)
-    test_data =  process(test_data, per_image=False)#.astype(np.float16)
+    test_data = process(test_data, per_image=False)#.astype(np.float16)
 
     _max = np.mean(train_data[np.invert(train_masks)])+4*np.std(train_data[np.invert(train_masks)])
     _min = np.absolute(np.mean(train_data[np.invert(train_masks)])-np.std(train_data[np.invert(train_masks)]))
@@ -51,7 +51,8 @@ def load_hera(args):
         rate = (1,1,1,1)
 
         train_data = get_patches(train_data, None, p_size,s_size,rate,'VALID')
-        train_masks = get_patches(train_masks, None, p_size,s_size,rate,'VALID').astype(np.bool)
+        train_masks = get_patches(train_masks.astype('int'), None, p_size,s_size,rate,'VALID').astype(np.bool) #Charl: does not like bool input
+       # train_masks = get_patches(train_masks, None, p_size, s_size, rate, 'VALID').astype(np.bool)
 
         test_data = get_patches(test_data, None, p_size,s_size,rate,'VALID')
         test_masks= get_patches(test_masks.astype('int') , None, p_size,s_size,rate,'VALID').astype(np.bool)
@@ -99,7 +100,7 @@ def load_lofar(args):
         train_indx = np.random.permutation(len(train_data))[:args.limit]
         test_indx = np.random.permutation(len(test_data))[:args.limit]
 
-        train_data  = train_data [train_indx]
+        train_data = train_data[train_indx]
         train_masks = train_masks[train_indx]
         #test_data   = test_data  [test_indx]
         #test_masks  = test_masks [test_indx]
@@ -126,7 +127,7 @@ def load_lofar(args):
 
         train_data = get_patches(train_data, None, p_size,s_size,rate,'VALID')
         test_data = get_patches(test_data, None, p_size,s_size,rate,'VALID')
-        train_masks = get_patches(train_masks, None, p_size,s_size,rate,'VALID').astype(np.bool)
+        train_masks = get_patches(train_masks.astype('int'), None, p_size,s_size,rate,'VALID').astype(np.bool)
         test_masks= get_patches(test_masks.astype('int') , None, p_size,s_size,rate,'VALID').astype(np.bool)
 
         train_labels = np.empty(len(train_data), dtype='object')
@@ -140,6 +141,7 @@ def load_lofar(args):
         ae_train_data  = train_data[np.invert(np.any(train_masks, axis=(1,2,3)))]
         ae_train_labels = train_labels[np.invert(np.any(train_masks, axis=(1,2,3)))]
 
+    # Waste of memory?
     unet_train_dataset = tf.data.Dataset.from_tensor_slices(train_data).shuffle(BUFFER_SIZE,seed=42).batch(BATCH_SIZE)
     ae_train_dataset = tf.data.Dataset.from_tensor_slices(ae_train_data).shuffle(BUFFER_SIZE,seed=42).batch(BATCH_SIZE)
 

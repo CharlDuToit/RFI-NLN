@@ -1,8 +1,12 @@
+"""
+Figure 2
+pickle and npy files are missing
+"""
 import numpy as np
 from glob import glob
 from tqdm import tqdm
 from matplotlib import pyplot as plt
-from PIL import image
+#from PIL import image
 
 train_data, train_masks, _, _= np.load('joined_dataset.pickle', allow_pickle=True)
 r = np.load('training_indexes.npy')
