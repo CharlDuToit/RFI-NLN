@@ -6,11 +6,12 @@ import time
 from models import UNET
 
 from utils.plotting import (generate_and_save_images,
-                            generate_and_save_training)
+                            save_training_metrics)
 
 from utils.training import print_epoch, save_checkpoint
 from model_config import *
 from .helper import end_routine
+from .generic_architecture import GenericArchitecture
 from inference import infer
 
 optimizer = tf.keras.optimizers.Adam()
@@ -34,6 +35,8 @@ def train_step(model, x, y):
 def train(unet, train_dataset, train_images, train_masks, test_images, test_labels, test_masks, args, verbose=True,
           save=True):
     unet_loss = []
+    dir_path = 'outputs/{}/{}/{}'.format(args.model, args.anomaly_class, args.model_name)
+
     train_mask_dataset = tf.data.Dataset.from_tensor_slices(train_masks.astype('float32')).shuffle(BUFFER_SIZE,
                                                                                                    seed=42).batch(
         BATCH_SIZE)
@@ -50,15 +53,23 @@ def train(unet, train_dataset, train_images, train_masks, test_images, test_labe
                                  image_batch[:25, ...],
                                  'UNET',
                                  args)
-        save_checkpoint(unet, epoch, args, 'UNET', 'unet')
+        #save_checkpoint(unet, epoch, args, 'UNET', 'unet') # make model subtype None and give value of model_type in save_checkpoint
+        save_checkpoint(dir_path, unet, 'UNET', epoch)
+
 
         unet_loss.append(auto_loss)  # auto_loss for the last batch
+        #save to text file
 
-        print_epoch('UNET', epoch, time.time() - start, {'UNET Loss': auto_loss.numpy()}, None)
+       # print_epoch('UNET', epoch, time.time() - start, {'UNET Loss': auto_loss.numpy()}, None)
+        print_epoch('UNET', epoch, time.time() - start, auto_loss.numpy(), 'unet loss')
 
-    generate_and_save_training([unet_loss],
-                               ['unet loss'],
-                               'UNET', args)
+    save_checkpoint(dir_path, unet, 'UNET')
+
+    save_training_metrics(dir_path, unet_loss, 'UNET loss')
+
+    #save_training_metrics_image([unet_loss],
+    #                            ['unet loss'],
+    #                           'UNET', args)
     generate_and_save_images(unet, epoch, image_batch[:25, ...], 'UNET', args)
 
     return unet
@@ -66,9 +77,13 @@ def train(unet, train_dataset, train_images, train_masks, test_images, test_labe
 
 def main(train_dataset, train_images, train_labels, train_masks, test_images, test_labels, test_masks, test_masks_orig,
          args):
-    unet = UNET(args)
+    #unet = UNET(args)
+    #unet = train(unet, train_dataset, train_images, train_masks, test_images, test_labels, test_masks, args)
+    #end_routine(train_images, test_images, test_labels, test_masks, test_masks_orig, [unet], 'UNET', args)
 
-    unet = train(unet, train_dataset, train_images, train_masks, test_images, test_labels, test_masks, args)
+    unet = UNET(args)
+    trainer = GenericArchitecture(unet)
+    unet = trainer.train(train_images, train_masks, args)
     end_routine(train_images, test_images, test_labels, test_masks, test_masks_orig, [unet], 'UNET', args)
 
 

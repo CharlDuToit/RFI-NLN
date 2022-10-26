@@ -54,15 +54,15 @@ def evaluate_performance(model,
         seg_iou_nln (float32): iou score for nln
     """
     # test images are already in patches
-    flops = 0 #per image
-    tot_time = 0 #per image
+    flops = 0  # per image
+    tot_time = 0  # per image
 
     if model_type == 'CNN_RFI_SUN':
-        #count flops and time
+        # count flops and time
         flops = get_flops(model[0]) * test_images.shape[0]
         start = time.time()
         x_hat = infer(model[0], test_images, args, 'CNN_RFI_SUN')
-        tot_time += (time.time()-start) / test_images.shape[0]
+        tot_time += (time.time() - start) / test_images.shape[0]
 
         # x_hat_recon = patches.reconstruct(x_hat, args)
         x_hat[x_hat == np.inf] = np.finfo(x_hat.dtype).max
@@ -101,16 +101,20 @@ def evaluate_performance(model,
                 flops, tot_time)
 
     # Get output from model #TODO: do we want to normalise?
-    test_data_recon = patches.reconstruct(test_images, args)
-    test_masks_recon = patches.reconstruct(test_masks, args)
-    test_masks_orig_recon = patches.reconstruct(test_masks_orig, args)
+    # test_data_recon = patches.reconstruct(test_images, args)
+    test_data_recon = patches.reconstruct(test_images, args.raw_input_shape, args.patch_x, args.patch_y)
+    # test_masks_recon = patches.reconstruct(test_masks, args)
+    test_masks_recon = patches.reconstruct(test_masks, args.raw_input_shape, args.patch_x, args.patch_y)
+    # test_masks_orig_recon = patches.reconstruct(test_masks_orig, args)
+    test_masks_orig_recon = patches.reconstruct(test_masks_orig, args.raw_input_shape, args.patch_x, args.patch_y)
 
     if model_type == 'UNET' or model_type == 'RNET' or model_type == 'RFI_NET':
-        #count flops and time
+        # count flops and time
         flops = get_flops(model[0])
         start = time.time()
         x_hat = infer(model[0], test_images, args, 'AE')
-        x_hat_recon = patches.reconstruct(x_hat, args)
+        # x_hat_recon = patches.reconstruct(x_hat, args)
+        x_hat_recon = patches.reconstruct(x_hat, args.raw_input_shape, args.patch_x, args.patch_y)
         x_hat_recon[x_hat_recon == np.inf] = np.finfo(x_hat_recon.dtype).max
         tot_time += (time.time() - start) / test_images.shape[0]
 
@@ -149,18 +153,19 @@ def evaluate_performance(model,
 
     elif model_type == 'DKNN':
         z_train = infer(model[0], train_images, args, 'DKNN')
-        #count flops and time
+        # count flops and time
         flops = get_flops(model[0])
         start = time.time()
         z_test = infer(model[0], test_images, args, 'DKNN')
 
         # count flops and time
-        flops += 0 # TODO
+        flops += 0  # TODO
         neighbours_dist, _, _, _ = nln(z_train, z_test, None, 'knn', 2, -1)
 
         # count flops and time
-        flops += 0 # TODO
-        dists_recon = get_dists(neighbours_dist, args)
+        flops += 0  # TODO
+        # dists_recon = get_dists(neighbours_dist, args)
+        dists_recon = get_dists(neighbours_dist, args.raw_input_shape, args.patch_x, args.patch_y)
         tot_time += (time.time() - start) / test_images.shape[0]
 
         (dknn_ao_auroc, dknn_true_auroc,
@@ -204,15 +209,19 @@ def evaluate_performance(model,
 
     x_hat_train = infer(model[0], train_images, args, 'AE')
     # count flops and time. Could speed if z_query is passed to model[0].decoder
-    flops = get_flops(model[0]) # encoder and decoder
+    flops = get_flops(model[0])  # encoder and decoder
     start = time.time()
     x_hat = infer(model[0], test_images, args, 'AE')
-    x_hat_recon = patches.reconstruct(x_hat, args)
+    # x_hat_recon = patches.reconstruct(x_hat, args)
+    x_hat_recon = patches.reconstruct(x_hat, args.raw_input_shape, args.patch_x, args.patch_y)
+
     tot_time += (time.time() - start) / test_images.shape[0]
 
     error = get_error('AE', test_images, x_hat, mean=False)
 
-    error_recon, labels_recon = patches.reconstruct(error, args, test_labels)
+    # error_recon, labels_recon = patches.reconstruct(error, args, test_labels)
+    error_recon, labels_recon = patches.reconstruct(error, args.raw_input_shape, args.patch_x, args.patch_y,
+                                                    args.anomaly_class, test_labels)
 
     (ae_ao_auroc, ae_true_auroc,
      ae_ao_auprc, ae_true_auprc,
@@ -247,15 +256,18 @@ def evaluate_performance(model,
     flops += 0
     if args.patches:
         if nln_error.ndim == 4:
-            nln_error_recon = patches.reconstruct(nln_error, args)
+            # nln_error_recon = patches.reconstruct(nln_error, args)
+            nln_error_recon = patches.reconstruct(nln_error, args.raw_input_shape, args.patch_x, args.patch_y)
         else:
-            nln_error_recon = patches.reconstruct_latent_patches(nln_error, args)
+            # nln_error_recon = patches.reconstruct_latent_patches(nln_error, args)
+            nln_error_recon = reconstruct_latent_patches(nln_error, args.raw_input_shape, args.patch_x, args.patch_y)
     else:
         nln_error_recon = nln_error
 
     # count FLOPS and time
-    dists_recon = get_dists(neighbours_dist, args)
-    tot_time += (time.time() - start) / test_images.shape[0]
+    # dists_recon = get_dists(neighbours_dist, args)
+    dists_recon = get_dists(neighbours_dist, args.raw_input_shape, args.patch_x, args.patch_y)
+    # tot_time += (time.time() - start) / test_images.shape[0]
 
     (nln_ao_auroc, nln_true_auroc,
      nln_ao_auprc, nln_true_auprc,
@@ -273,14 +285,14 @@ def evaluate_performance(model,
     combined_ao_aurocs, combined_ao_auprcs, combined_ao_f1s = [], [], []
     for alpha in args.alphas:
         # Count FLOPS and time
-        flops  += 0
+        flops += 0
         if args.data == 'LOFAR':
             combined_recon = np.clip(nln_error_recon, nln_error_recon.mean() + nln_error_recon.std() * 5,
                                      1.0) * np.array([d > np.percentile(d, 66) for d in dists_recon])  #
         elif args.data == 'HERA':
             combined_recon = nln_error_recon * np.array([d > np.percentile(d, 10) for d in dists_recon])  #
 
-        tot_time += (time.time() - start) / test_images.shape[0] # NB THIS LOOP SHOULD RUN ONLY ONCE
+        tot_time += (time.time() - start) / test_images.shape[0]  # NB THIS LOOP SHOULD RUN ONLY ONCE
 
         combined_recon = np.nan_to_num(combined_recon)
         (combined_ao_auroc, combined_true_auroc,
@@ -374,7 +386,7 @@ def normalise(x):
     return np.array(y)
 
 
-def get_dists(neighbours_dist, args):
+def get_dists(neighbours_dist, raw_input_shape, patch_x, patch_y):
     """
         Reconstruct distance vector to original dimensions when using patches
 
@@ -388,12 +400,16 @@ def get_dists(neighbours_dist, args):
         dists (np.array): reconstructed patches if necessary
 
     """
+    patches = raw_input_shape[0] > patch_x or raw_input_shape[1] > patch_y
 
     dists = np.mean(neighbours_dist, axis=tuple(range(1, neighbours_dist.ndim)))
-    if args.patches:
-        dists = np.array([[d] * args.patch_x ** 2 for i, d in enumerate(dists)]).reshape(len(dists), args.patch_x,
-                                                                                         args.patch_y)
-        dists_recon = reconstruct(np.expand_dims(dists, axis=-1), args)
+    if patches:
+        # if args.patches:
+        # dists = np.array([[d] * args.patch_x ** 2 for i, d in enumerate(dists)]).reshape(len(dists), args.patch_x, args.patch_y)
+        dists = np.array([[d] * patch_x * patch_y for i, d in enumerate(dists)]).reshape(len(dists), patch_x, patch_y)
+
+        # dists_recon = reconstruct(np.expand_dims(dists, axis=-1), args)
+        dists_recon = reconstruct(np.expand_dims(dists, axis=-1), raw_input_shape, patch_x, patch_y)
         return dists_recon
     else:
         return dists

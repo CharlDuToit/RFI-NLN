@@ -2,11 +2,11 @@ import tensorflow as tf
 import numpy as np
 import time
 from models import (Autoencoder,
-                   Discriminator_x)
+                    Discriminator)
 
 from utils.plotting  import  (generate_and_save_images,
-                             generate_and_save_training,
-                             save_training_curves)
+                              save_training_metrics,
+                              save_training_curves)
 
 from utils.training import print_epoch,save_checkpoint
 from model_config import *
@@ -65,6 +65,8 @@ def train_step(ae,discriminator, x,):# xn):
 
 def train(ae,discriminator, train_dataset,test_images,test_labels,args):
     ae_loss,d_loss, g_loss= [], [], []
+    dir_path = 'outputs/{}/{}/{}'.format(args.model, args.anomaly_class, args.model_name)
+
     for epoch in range(args.epochs):
         start = time.time()
         for image_batch in train_dataset:
@@ -83,25 +85,38 @@ def train(ae,discriminator, train_dataset,test_images,test_labels,args):
                                  'DAE_disc',
                                  args)
 
-        save_checkpoint(ae,epoch,args,'DAE_disc','ae')
-        save_checkpoint(discriminator, epoch, args,'DAE_disc','disc')
+        #save_checkpoint(ae,epoch,args,'DAE_disc','ae')
+        #save_checkpoint(discriminator, epoch, args,'DAE_disc','disc')
+        save_checkpoint(dir_path, ae, 'AE', epoch)
+        save_checkpoint(dir_path, discriminator, 'DISC', epoch)
+
+
 
         ae_loss.append(auto_loss)
         d_loss.append(disc_loss)
         g_loss.append(gen_loss)
 
+        print_epoch('DAE_DISC',
+                    epoch,
+                    time.time() - start,
+                    [auto_loss.numpy(), disc_loss.numpy(), gen_loss.numpy()],
+                    ['AE Loss','Discrimator Loss','Generator Loss'])
 
-        print_epoch('DAE_disc',
-                     epoch,
-                     time.time()-start,
-                     {'AE Loss':auto_loss.numpy(),
-                      'Discrimator Loss':disc_loss.numpy(),
-                      'Generator Loss':gen_loss.numpy()},
-                     None)
+        #print_epoch('DAE_disc',
+        #             epoch,
+        #             time.time()-start,
+        #             {'AE Loss':auto_loss.numpy(),
+        #              'Discrimator Loss':disc_loss.numpy(),
+        #              'Generator Loss':gen_loss.numpy()},
+        #             None)
 
-    generate_and_save_training([ae_loss,d_loss,g_loss],
-                                ['ae loss','disc loss','gen loss'],
-                                'DAE_disc',args)
+    save_checkpoint(dir_path, ae, 'AE')
+    save_checkpoint(dir_path, discriminator, 'DISC')
+    save_training_metrics(dir_path, [ae_loss, d_loss, g_loss], ['AE loss', 'DISC loss', 'GEN loss'])
+
+   # save_training_metrics_image([ae_loss, d_loss, g_loss],
+    #                            ['ae loss','disc loss','gen loss'],
+    #                            'DAE_disc', args)
 
     generate_and_save_images(ae,epoch,image_batch[:25,...],'DAE_disc',args)
 
@@ -114,7 +129,7 @@ def main(train_dataset,train_images, train_labels, test_images, test_labels, tes
         discriminator = Discriminator_x_MVTEC(args)
     else:
         ae = Autoencoder(args)
-        discriminator = Discriminator_x(args)
+        discriminator = Discriminator(args)
     ae, discriminator = train(ae,
                               discriminator,
                               train_dataset,

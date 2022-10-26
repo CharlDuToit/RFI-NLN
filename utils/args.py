@@ -10,7 +10,7 @@ from .hardcoded_args import resolve_model_config_args
 parser = argparse.ArgumentParser(description='Train generative anomaly detection models')
 
 parser.add_argument('-model', metavar='-m', type=str, default='AE',
-                    choices={'AC_UNET', 'UNET', 'AE', 'DAE', 'DKNN', 'RNET', 'CNN_RFI_SUN', 'RFI_NET', 'AE-SSIM'},
+                    choices={'AC_UNET', 'UNET', 'AE', 'DAE', 'DKNN', 'RNET', 'CNN_RFI_SUN', 'RFI_NET', 'AE-SSIM', 'DSC_DUAL_RESUNET', 'DSC_MONO_RESUNET', 'ASPP_UNET'},
                     help='Which model to train and evaluate')
 parser.add_argument('-limit', metavar='-l', type=str, default='None',
                     help='Limit on the number of samples in training data ')
@@ -26,7 +26,7 @@ parser.add_argument('-latent_dim', metavar='-ld', type=int, default=2,
                     help='The latent dimension size of the AE based models')
 parser.add_argument('-alphas', metavar='-alph', type=float, nargs='+', default=[1.0],
                     help='The maximum number of neighbours for latent reconstruction')
-parser.add_argument('-neighbors', metavar='-n', type=int, nargs='+', default=[2, 4, 5, 6, 7, 8, 9],
+parser.add_argument('-neighbours', metavar='-n', type=int, nargs='+', default=[2, 4, 5, 6, 7, 8, 9],
                     help='The maximum number of neighbours for latent reconstruction')
 parser.add_argument('-radius', metavar='-r', type=float, nargs='+', default=[0.1, 0.5, 1, 2, 5, 10],
                     help='The radius of the unit circle for finding neighbours in frNN')
@@ -75,10 +75,18 @@ parser.add_argument('-height', metavar='-h', type=int, default=3,
 parser.add_argument('-level_blocks', metavar='-nlb', type=int, default=1,
                     help='Number of blocks per level. A block can have one or more layers')
 parser.add_argument('-model_config', metavar='-mcf', type=str, default='args',
-                    choices={'args', 'common', 'same', 'custom', 'author'},
+                    choices={'args', 'common', 'same', 'custom', 'author', 'tiny'},
                     help='Which args to overwrite with default set.')
 parser.add_argument('-dropout', metavar='-drop', type=float, default=0.0,
                     help='Dropout rate between 0 and 1')
+parser.add_argument('-batch_size', metavar='-bas', type=int, default=1024,
+                    help='Batch size')
+parser.add_argument('-buffer_size', metavar='-bus', type=int, default=25000,
+                    help='Buffer size')
+parser.add_argument('-optimal_alpha', metavar='-oalpha', type=bool, default=True,
+                    help='Replace args.alphas with list of one alpha which is optimized for args.data for AE')
+parser.add_argument('-optimal_neighbours', metavar='-oneighs', type=bool, default=True,
+                    help='Replace args.neighbours with list of one neighbours which is optimized for AE')
 
 args = parser.parse_args()
 args.model_name = new_name()
@@ -86,31 +94,32 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = args.debug
 args.dilation_rate = 1
 
 if args.data == 'MNIST' or args.data == 'FASHION_MNIST':
-    args.input_shape = (28, 28, 1)
+    args.raw_input_shape = (28, 28, 1)
 
 elif args.data == 'CIFAR10':
-    args.input_shape = (32, 32, 3)
+    args.raw_input_shape = (32, 32, 3)
 
 elif args.data == 'MVTEC':
     if (('grid' in args.anomaly_class) or
             ('screw' in args.anomaly_class) or
             ('zipper' in args.anomaly_class)):
-        args.input_shape = (1024, 1024, 1)
+        args.raw_input_shape = (1024, 1024, 1)
     else:
-        args.input_shape = (1024, 1024, 3)
+        args.raw_input_shape = (1024, 1024, 3)
 
 elif args.data == 'HERA':
-    args.input_shape = (512, 512, 1)
+    args.raw_input_shape = (512, 512, 1)
 
 elif args.data == 'HIDE':
-    args.input_shape = (256, 256, 1)
+    args.raw_input_shape = (256, 256, 1)
 
 elif args.data == 'LOFAR':
-    args.input_shape = (128, 64, 1)
+    args.raw_input_shape = (512, 512, 1)
 
 # elif args.data == 'HERA_PHASE':
 # args.input_shape = (512,512,2)
 
+args.input_shape = args.raw_input_shape
 
 if args.patches:
     args.input_shape = (args.patch_x, args.patch_y, args.input_shape[-1])

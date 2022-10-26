@@ -3,20 +3,14 @@ import numpy as np
 from tensorflow.keras import layers
 #from model_config import n_layers, n_filters
 
-from .helper import generic_block, generic_unet
+from .generic_builder import GenericBlock, GenericUnet
 
 tf.keras.backend.set_floatx('float32')
 
-
-def AC_UNET_old(args,
-                n_filters=64,
-                dilation_rate=7,
-                dropout=0.05,
-                batchnorm=True,  # not mentioned in article
-                height=3):
+def AC_UNET(args):
     """
     Charl's implementation according to the article:
-    0Radio frequency interference detection based on the AC-UNet model
+    0 Radio frequency interference detection based on the AC-UNet model
     Rui-Qing-Yan
     Accepted 2020 December
 
@@ -34,53 +28,15 @@ def AC_UNET_old(args,
     two-layer upsampling layers - see above paragraph
     """
     input_data = tf.keras.Input(args.input_shape, name='data')
-    max_height = np.floor(np.log2(args.input_shape[0])).astype(int)  # - 1  # why -1?  minimum tensor size 2x2
-    height = max_height if height is None else np.minimum(height, max_height)
+    max_height = np.floor(np.log2(args.input_shape[0])).astype(int) - 1  # why -1?  minimum tensor size 2x2
+    height = max_height if args.height is None else np.minimum(args.height, max_height)
 
-    f_mult = 1
-    down_blocks = [None] * (height - 1)  # [None] *(3-1) : 32, 16, belly 8
-    x = input_data
+    dilation_rate = args.dilation_rate if args.dilation_rate > 1 else 2  # pretty pointless to have dr of 1
 
-    for lid in range(0, height - 1, 1):
-        x = generic_block(x, 'caca', n_filters * f_mult, strides=1, dilation_rate=dilation_rate)
-        down_blocks[lid] = x
-        x = generic_block(x, 'm')
-        f_mult *= 2
+    level_block = GenericBlock('ncba', args.filters, blocks=args.level_blocks, dilation_rate=dilation_rate)
+    x = GenericUnet(height, level_block=level_block)(input_data)
 
-    x = generic_block(x, 'caca', n_filters * f_mult, strides=1)
-
-    for lid in range(lid, -1, -1):  # 0..4, 5 values
-        f_mult /= 2
-        x = generic_block(x,
-                          'tn caca',  # layer_chars,
-                          n_filters * f_mult,
-                          skip_tensor=down_blocks[lid],
-                          strides=[2, 1],  # strides,
-                          # dropout=dropout
-                          dilation_rate=[1, dilation_rate])
-
-    x = generic_block(x, 'dc', 1, strides=1, kernel_size=1, dropout=dropout)
-    x = layers.Activation('sigmoid')(x)
-
-    model = tf.keras.Model(inputs=[input_data], outputs=[x])
-    return model
-
-
-def AC_UNET(args,
-            n_filters=64,
-            dilation_rate=7,
-            dropout=0.05,
-            batchnorm=True,  # not mentioned in article
-            height=3):
-    input_data = tf.keras.Input(args.input_shape, name='data')
-    max_height = np.floor(np.log2(args.input_shape[0])).astype(int)  # - 1  # why -1?  minimum tensor size 2x2
-    height = max_height if height is None else np.minimum(height, max_height)
-
-    down_kwargs = dict(layer_chars='cba cba', dilation_rate=dilation_rate, dropout=dropout)
-    up_kwargs = dict(layer_chars='tn cbacba', strides=[2, 1], dilation_rate=[1, dilation_rate], dropout=dropout)
-    x = generic_unet(input_data, height, n_filters, down_kwargs=down_kwargs, mid_kwargs=down_kwargs, up_kwargs=up_kwargs)
-
-    x = generic_block(x, 'dca', 1, strides=1, kernel_size=1, dropout=dropout, activation='sigmoid')
+    x = GenericBlock('ca', 1, kernel_size=1, strides=1, activation='sigmoid')(x)
 
     model = tf.keras.Model(inputs=[input_data], outputs=[x])
     return model

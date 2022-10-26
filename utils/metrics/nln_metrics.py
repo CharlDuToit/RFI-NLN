@@ -2,13 +2,14 @@ import tensorflow as tf
 import numpy as np
 from time import time
 import pickle
-from sklearn import metrics,neighbors
-import faiss 
+from sklearn import metrics, neighbors
+import faiss
 from inference import infer, get_error
 from utils.data import reconstruct, reconstruct_latent_patches, sizes, process
 from model_config import *
 import itertools
 import warnings
+
 warnings.filterwarnings('ignore')
 
 
@@ -37,10 +38,10 @@ def nln(z, z_query, x_hat_train, algorithm, neighbours, radius=None):
         index = faiss.IndexFlatL2(z.shape[1])
         index.add(z.astype(np.float32))
         neighbours_dist, neighbours_idx = index.search(z_query.astype(np.float32), neighbours)
-        neighbour_mask  = np.zeros([len(neighbours_idx)], dtype=bool)
+        neighbour_mask = np.zeros([len(neighbours_idx)], dtype=bool)
 
-        
     return neighbours_dist, neighbours_idx, x_hat_train, neighbour_mask
+
 
 def get_nln_errors(model,
                    model_type,
@@ -72,45 +73,45 @@ def get_nln_errors(model,
 
     """
 
-    x_hat  = infer(model[0], test_images, args, 'AE')
-    test_images_stacked = np.stack([test_images]*neighbours_idx.shape[-1],axis=1)
+    x_hat = infer(model[0], test_images, args, 'AE')
+    test_images_stacked = np.stack([test_images] * neighbours_idx.shape[-1], axis=1)
     neighbours = x_hat_train[neighbours_idx]
 
-    if ((model_type == 'AE') or 
-        (model_type == 'AE_SSIM') or
-        (model_type == 'AAE') or
-        (model_type == 'DAE') or
-        (model_type == 'VAE')):
+    if ((model_type == 'AE') or
+            (model_type == 'AE_SSIM') or
+            (model_type == 'AAE') or
+            (model_type == 'DAE') or
+            (model_type == 'VAE')):
 
-        error_nln = get_error(model_type, test_images_stacked,neighbours,mean=False) 
-        error = np.mean(error_nln, axis =1) #nanmean for frNN 
+        error_nln = get_error(model_type, test_images_stacked, neighbours, mean=False)
+        error = np.mean(error_nln, axis=1)  # nanmean for frNN
 
-        error_recon = get_error(model_type, test_images, x_hat, mean=False) 
+        error_recon = get_error(model_type, test_images, x_hat, mean=False)
 
         error[neighbour_mask] = error_recon[neighbour_mask]
 
     elif model_type == 'DAE_disc':
         disc_x_hat_train = infer(model[1], x_hat_train, args, 'disc')
         disc_x = infer(model[1], test_images, args, 'disc')
-        disc_x_hat  = infer(model[1], x_hat, args, 'disc')
+        disc_x_hat = infer(model[1], x_hat, args, 'disc')
 
-        disc_x_stacked = np.stack([disc_x]*neighbours_idx.shape[-1],axis=1)
+        disc_x_stacked = np.stack([disc_x] * neighbours_idx.shape[-1], axis=1)
         disc_neighbours = disc_x_hat_train[neighbours_idx]
 
-        error_nln = get_error(model_type, 
+        error_nln = get_error(model_type,
                               test_images_stacked,
                               neighbours,
-                              d_x = disc_x_stacked, 
-                              d_x_hat = disc_neighbours, 
-                              mean=False) 
-        error = np.mean(error_nln, axis =1) #nanmean for frNN 
+                              d_x=disc_x_stacked,
+                              d_x_hat=disc_neighbours,
+                              mean=False)
+        error = np.mean(error_nln, axis=1)  # nanmean for frNN
 
-        error_recon = get_error(model_type, 
+        error_recon = get_error(model_type,
                                 test_images,
                                 x_hat,
-                                d_x = disc_x, 
-                                d_x_hat = disc_x_hat, 
-                                mean=False) 
+                                d_x=disc_x,
+                                d_x_hat=disc_x_hat,
+                                mean=False)
 
         error[neighbour_mask] = error_recon[neighbour_mask]
 
@@ -120,29 +121,30 @@ def get_nln_errors(model,
         z_hat = infer(model[2], x_hat, args, 'encoder')
 
         z_neighbours = z[neighbours_idx]
-        z_hat_stacked = np.stack([z_hat]*neighbours_idx.shape[-1],axis=1)
+        z_hat_stacked = np.stack([z_hat] * neighbours_idx.shape[-1], axis=1)
 
-        error_nln = get_error(model_type, 
+        error_nln = get_error(model_type,
                               test_images_stacked,
                               neighbours,
-                              z = z_neighbours, 
-                              z_hat = z_hat_stacked, 
-                              mean=False) 
+                              z=z_neighbours,
+                              z_hat=z_hat_stacked,
+                              mean=False)
 
-        error = np.mean(error_nln, axis =1) #nanmean for frNN 
+        error = np.mean(error_nln, axis=1)  # nanmean for frNN
 
-        error_recon  = get_error(model_type, 
-                                 test_images,
-                                 x_hat,
-                                 z = z_query, 
-                                 z_hat = z_hat, 
-                                 mean=False) 
+        error_recon = get_error(model_type,
+                                test_images,
+                                x_hat,
+                                z=z_query,
+                                z_hat=z_hat,
+                                mean=False)
 
         error[neighbour_mask] = error_recon[neighbour_mask]
 
     return error
 
 
+# HAS NO USAGES
 def get_nln_metrics(model,
                     train_images,
                     test_images,
@@ -176,22 +178,22 @@ def get_nln_metrics(model,
 
     """
 
-    z_query = infer(model[0].encoder, test_images, args, 'encoder') 
+    z_query = infer(model[0].encoder, test_images, args, 'encoder')
     z = infer(model[0].encoder, train_images, args, 'encoder')
     x_hat_train = infer(model[0], train_images, args, 'AE')
     x_hat = infer(model[0], test_images, args, 'AE')
 
-    d,max_auc,max_neighbours,max_radius,index_counter = {},0,0,0,0
+    d, max_auc, max_neighbours, max_radius, index_counter = {}, 0, 0, 0, 0
     dists_auc, sum_auc, mul_auc = [], [], []
-    
-    for n_bour in args.neighbors:
+
+    for n_bour in args.neighbours:
         if args.algorithm == 'knn':
             t = time()
-            neighbours_dist, neighbours_idx, x_hat_train, neighbour_mask = nln(z, 
-                                                                               z_query, 
-                                                                               x_hat_train, 
-                                                                               args.algorithm, 
-                                                                               n_bour, 
+            neighbours_dist, neighbours_idx, x_hat_train, neighbour_mask = nln(z,
+                                                                               z_query,
+                                                                               x_hat_train,
+                                                                               args.algorithm,
+                                                                               n_bour,
                                                                                radius=None)
             error = get_nln_errors(model,
                                    model_type,
@@ -202,49 +204,57 @@ def get_nln_metrics(model,
                                    neighbours_idx,
                                    neighbour_mask,
                                    args)
-            if args.patches:  
-                if error.ndim ==4:
-                    error, test_labels_ = reconstruct(error, args, test_labels) 
+            if args.patches:
+                if error.ndim == 4:
+                    # error, test_labels_ = reconstruct(error, args, test_labels)
+                    error, test_labels_ = reconstruct(error, args.raw_input_shape, args.patch_x, args.patch_y,
+                                                      args.anomaly_class, test_labels)
+
                 else:
-                    error, test_labels_ = reconstruct_latent_patches(error, args, test_labels) 
+                    # error, test_labels_ = reconstruct_latent_patches(error, args, test_labels)
+                    error, test_labels_ = reconstruct_latent_patches(error, args.raw_input_shape, args.patch_x,
+                                                                     args.patch_y, args.anomaly_class, test_labels)
 
             recon_error = get_error('AE', test_images, x_hat, mean=False)
 
             if args.patches:
-                recon_error, test_labels_ = reconstruct(recon_error, args, test_labels) 
+                # recon_error, test_labels_ = reconstruct(recon_error, args, test_labels)
+                error, test_labels_ = reconstruct(recon_error, args.raw_input_shape, args.patch_x, args.patch_y,
+                                                  args.anomaly_class, test_labels)
             else:
                 recon_error, test_labels_ = recon_error, test_labels
 
-            recon_error = process(np.nanmean(recon_error,axis=tuple(range(1,recon_error.ndim))), per_image=False)
+            recon_error = process(np.nanmean(recon_error, axis=tuple(range(1, recon_error.ndim))), per_image=False)
 
-            error = process(np.nanmean(error,axis=tuple(range(1,error.ndim))), per_image =False)
-            dists = process(get_dists(neighbours_dist,args),per_image =False)
+            error = process(np.nanmean(error, axis=tuple(range(1, error.ndim))), per_image=False)
+            dists = process(get_dists(neighbours_dist, args), per_image=False)
 
             if args.anomaly_type == 'MISO':
-                add = metrics.roc_auc_score(test_labels_==args.anomaly_class, error+dists+recon_error)
-                mul = metrics.roc_auc_score(test_labels_==args.anomaly_class, 0.3*error+0.7*dists )
-                dists = metrics.roc_auc_score(test_labels_==args.anomaly_class, dists)
+                add = metrics.roc_auc_score(test_labels_ == args.anomaly_class, error + dists + recon_error)
+                mul = metrics.roc_auc_score(test_labels_ == args.anomaly_class, 0.3 * error + 0.7 * dists)
+                dists = metrics.roc_auc_score(test_labels_ == args.anomaly_class, dists)
             else:
-                add = metrics.roc_auc_score(test_labels_!=args.anomaly_class, error+dists+recon_error)
-                mul = metrics.roc_auc_score(test_labels_!=args.anomaly_class, 0.3*error+0.7*dists)
-                dists = metrics.roc_auc_score(test_labels_!=args.anomaly_class, dists)
+                add = metrics.roc_auc_score(test_labels_ != args.anomaly_class, error + dists + recon_error)
+                mul = metrics.roc_auc_score(test_labels_ != args.anomaly_class, 0.3 * error + 0.7 * dists)
+                dists = metrics.roc_auc_score(test_labels_ != args.anomaly_class, dists)
 
             dists_auc.append(dists)
             sum_auc.append(add)
             mul_auc.append(mul)
 
-            temp_args = [error,test_labels_,args.anomaly_class,args.neighbors,
-                         [float('nan')],n_bour,float('nan'), max_auc,max_neighbours,
-                          max_radius,index_counter,d,t,dists_auc[-1], sum_auc[-1], mul_auc[-1],args.anomaly_type]
+            temp_args = [error, test_labels_, args.anomaly_class, args.neighbours,
+                         [float('nan')], n_bour, float('nan'), max_auc, max_neighbours,
+                         max_radius, index_counter, d, t, dists_auc[-1], sum_auc[-1], mul_auc[-1], args.anomaly_type]
 
+            (max_auc, max_neighbours,
+             max_radius, index_counter, d) = get_max_score(temp_args)
 
-            (max_auc,max_neighbours,
-                    max_radius,index_counter,d) =  get_max_score(temp_args)
+    with open('outputs/{}/{}/{}/latent_scores.pkl'.format(model_type, args.anomaly_class, args.model_name), 'wb') as f:
+        pickle.dump(d, f)
 
-    with open('outputs/{}/{}/{}/latent_scores.pkl'.format(model_type,args.anomaly_class,args.model_name),'wb') as f:
-        pickle.dump(d,f)
+    return max_auc, max_neighbours, max_radius, np.max(dists_auc), np.max(sum_auc), np.max(
+        mul_auc), x_hat, x_hat_train, neighbours_idx, neighbours_dist
 
-    return max_auc,max_neighbours,max_radius,np.max(dists_auc), np.max(sum_auc), np.max(mul_auc), x_hat, x_hat_train, neighbours_idx, neighbours_dist
 
 def get_max_score(args):
     """
@@ -263,34 +273,36 @@ def get_max_score(args):
         d (float32): dictionary of optimal vals 
 
     """
-    (error,test_labels,anomaly,n_bours,
-           radius,n_bour,rad,max_auc,
-           max_neighbours,max_radius,
-           index_counter,d,t, dist_auc, sum_auc, mul_auc,anomaly_type) = args
+    (error, test_labels, anomaly, n_bours,
+     radius, n_bour, rad, max_auc,
+     max_neighbours, max_radius,
+     index_counter, d, t, dist_auc, sum_auc, mul_auc, anomaly_type) = args
 
     if anomaly_type == 'MISO':
-        fpr, tpr, thr  = metrics.roc_curve(test_labels==anomaly,error)
+        fpr, tpr, thr = metrics.roc_curve(test_labels == anomaly, error)
 
-        a_u_c = metrics.roc_auc_score(test_labels==anomaly,error)
+        a_u_c = metrics.roc_auc_score(test_labels == anomaly, error)
 
     else:
-        fpr, tpr, thr  = metrics.roc_curve(test_labels!=anomaly,error)
+        fpr, tpr, thr = metrics.roc_curve(test_labels != anomaly, error)
 
-        a_u_c = metrics.roc_auc_score(test_labels!=anomaly,error)
+        a_u_c = metrics.roc_auc_score(test_labels != anomaly, error)
 
     if a_u_c > max_auc: max_auc = a_u_c; max_neighbours = n_bour;max_radius = rad;
 
     d[index_counter] = [n_bour, rad, a_u_c, dist_auc, sum_auc, mul_auc]
-    index_counter+=1
+    index_counter += 1
     print("{}/{} auc-roc = {}, dist-auc = {}, sum-auc ={}, mul-acu ={} time elapsed = {}s".format(index_counter,
-                                                         len(n_bours)*len(radius),
-                                                         a_u_c,
-                                                         dist_auc,
-                                                         sum_auc,
-                                                         mul_auc,
-                                                         time()-t))
+                                                                                                  len(n_bours) * len(
+                                                                                                      radius),
+                                                                                                  a_u_c,
+                                                                                                  dist_auc,
+                                                                                                  sum_auc,
+                                                                                                  mul_auc,
+                                                                                                  time() - t))
 
-    return max_auc,max_neighbours,max_radius,index_counter,d
+    return max_auc, max_neighbours, max_radius, index_counter, d
+
 
 def get_dists(neighbours_dist, args):
     """
@@ -307,17 +319,17 @@ def get_dists(neighbours_dist, args):
 
     """
 
-    dists = np.mean(neighbours_dist, axis = tuple(range(1,neighbours_dist.ndim)))
+    dists = np.mean(neighbours_dist, axis=tuple(range(1, neighbours_dist.ndim)))
 
     if args.patches:
-        n_patches = sizes[str(args.anomaly_class)]//args.patch_x
-        srt,fnnsh = 0,n_patches**2
+        n_patches = sizes[str(args.anomaly_class)] // args.patch_x
+        srt, fnnsh = 0, n_patches ** 2
         dists_recon = []
-        for i in range(0,len(dists),n_patches**2):
-            dists_recon.append(np.max(dists[srt:fnnsh])) ## USING MAX
+        for i in range(0, len(dists), n_patches ** 2):
+            dists_recon.append(np.max(dists[srt:fnnsh]))  ## USING MAX
             srt = fnnsh
-            fnnsh += n_patches**2
+            fnnsh += n_patches ** 2
 
         return np.array(dists_recon)
     else:
-        return dists 
+        return dists

@@ -8,7 +8,7 @@ N_PATCHES = 10
 def plot_neighs(test_images, test_labels, test_masks, x_hat, neighbours, neighbours_dist,model_type, args):
     rs = np.random.randint(0,len(test_labels),N_PATCHES) 
     if args.data == 'MVTEC' or args.data == 'HERA' or args.data == 'LOFAR': n = 4
-    fig, ax = plt.subplots(N_PATCHES, args.neighbors[-1]+n, figsize=(10,10))
+    fig, ax = plt.subplots(N_PATCHES, args.neighbours[-1]+n, figsize=(10,10))
 
     if args.data == 'MVTEC':
         if (('grid' in args.anomaly_class) or ('screw' in args.anomaly_class) or ('zipper' in args.anomaly_class)): 

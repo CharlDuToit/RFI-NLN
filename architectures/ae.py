@@ -6,7 +6,7 @@ import time
 from models import Autoencoder
 
 from utils.plotting  import  (generate_and_save_images,
-                             generate_and_save_training)
+                              save_training_metrics)
 
 from utils.training import print_epoch,save_checkpoint
 from model_config import *
@@ -34,26 +34,27 @@ def train_step(model, x):
 
 def train(ae,train_dataset,train_images, test_images,test_labels,args,verbose=True,save=True):
     ae_loss= []
+    dir_path = 'outputs/{}/{}/{}'.format(args.model, args.anomaly_class, args.model_name)
     for epoch in range(args.epochs):
         start = time.time()
 
         for image_batch in train_dataset:
-            auto_loss  =  train_step(ae,image_batch)
+            auto_loss = train_step(ae,image_batch)
 
         generate_and_save_images(ae,
                                  epoch + 1,
                                  image_batch[:25,...],
                                  'AE',
                                  args)
-        save_checkpoint(ae,epoch, args,'AE','ae')
+        save_checkpoint(dir_path, ae,'AE', epoch)
 
         ae_loss.append(auto_loss)
 
-        print_epoch('AE',epoch,time.time()-start,{'AE Loss':auto_loss.numpy()},None)
+        #print_epoch('AE',epoch,time.time()-start,{'AE Loss':auto_loss.numpy()},None)
+        print_epoch('AE', epoch, time.time() - start, auto_loss.numpy(), 'loss')
 
-    generate_and_save_training([ae_loss],
-                                ['ae loss'],
-                                'AE',args)
+    save_checkpoint(dir_path, ae, 'AE')
+    save_training_metrics(dir_path, ae_loss, 'AE loss')
     generate_and_save_images(ae,epoch,image_batch[:25,...],'AE',args)
 
     return ae

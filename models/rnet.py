@@ -2,11 +2,11 @@ import tensorflow as tf
 import numpy as np
 from tensorflow.keras import layers
 #from model_config import n_layers, n_filters
-from .helper import generic_block, GenericBlock
+from .generic_builder import  GenericBlock
 
 tf.keras.backend.set_floatx('float32')
 
-def RNET_old(args):
+def RNET_mesarcik(args):
     """
     Implemented by Mesarcik
     14 Deep Learning improves identification of Radio Frequency Interference 2020
@@ -15,6 +15,8 @@ def RNET_old(args):
     1 shortcut connection for 5 and 6 layers
     0 shortcut connections for 3 layers
     Authors believe R-Net5 and R-Net6 is the best, but Mesarcick implemented R-Net7 in the code below
+
+    used MSE and BCE and find MSE to be better
     """
     input_data = tf.keras.Input(args.input_shape, name='data')
 
@@ -44,34 +46,34 @@ def RNET_old(args):
     x8 = layers.BatchNormalization()(x8)
     x8 = tf.nn.relu(x8)
 
-    x_out = layers.Conv2D(filters=1, kernel_size=5, strides=(1, 1), padding='same', activation=tf.nn.relu)(x8)
+    # Mesarcic had kernel_size 5, Charl changed it back to 1
+    # Mesarcic had relu as final activation, charl changed to sigmoid.
+    # Paper 14 never mentions any activation function excpet RELU,
+    x_out = layers.Conv2D(filters=1, kernel_size=1, strides=(1, 1), padding='same', activation='sigmoid')(x8)
 
     model = tf.keras.Model(inputs=[input_data], outputs=[x_out])
     return model
 
 
-def RNET_gen_old(args):
-    """
-    Charl's reimplementation of Mesarcik's RNET  -- yields exactly the same model
-    """
-    input_data = tf.keras.Input(args.input_shape, name='data')
-    xp = layers.Conv2D(filters=12, kernel_size=5, strides=(1, 1), padding='same')(input_data)
-    x3 = generic_block(xp, 'ba cba cba p', 12, skip_tensor=xp, kernel_size=5, strides=1)
-    x7 = generic_block(x3, 'cba cba p', 12, skip_tensor=x3, kernel_size=5, strides=1)
-    x = generic_block(x7, 'cba ca', [12, 1], kernel_size=5, strides=1)
-    model = tf.keras.Model(inputs=[input_data], outputs=[x])
-    return model
-
-
 def RNET(args):
     """
-    Charl's reimplementation of Mesarcik's RNET  -- yields exactly the same model
+    Charl's reimplementation of Mesarcik's RNET
     """
     input_data = tf.keras.Input(args.input_shape, name='data')
     xp = layers.Conv2D(filters=args.filters, kernel_size=5, strides=(1, 1), padding='same')(input_data)
     x3 = GenericBlock('ba cba cba p', args.filters, kernel_size=5, strides=1)(xp, skip_tensor=xp)
     x7 = GenericBlock('cba cba p', args.filters, kernel_size=5, strides=1)(x3, skip_tensor=x3)
-    x = GenericBlock('cba ca', [args.filters, 1], kernel_size=5, strides=1)(x7)
+    # Mesarcic had kernel_size 5, Charl changed it back to 1
+    # Mesarcic had relu as final activation, charl changed to sigmoid.
+    # Paper 14 never mentions any activation function excpet RELU,
+
+    #"After each convolutional layer (except the last one)
+    #we find that inserting batch normalization layer and using
+    #RELU activation functions to be optimal"
+
+    x = GenericBlock('cba', args.filters, kernel_size=5, strides=1, activation='relu')(x7)
+    x = GenericBlock('ca', 1, kernel_size=1, strides=1, activation='sigmoid')(x)
+
     model = tf.keras.Model(inputs=[input_data], outputs=[x])
     return model
 

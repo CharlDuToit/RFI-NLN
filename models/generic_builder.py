@@ -1,23 +1,6 @@
 # import tensorflow as tf
 from tensorflow.keras import layers
-
-
-def conv2D_block(input_tensor, n_filters, kernel_size=3, strides=1, dilation_rate=1, dropout=0.0, batchnorm=True):
-    # dilation_rate > 1 requires strides=1
-    x = layers.Conv2D(filters=n_filters,
-                      kernel_size=kernel_size,
-                      kernel_initializer='he_normal',
-                      strides=strides,
-                      dilation_rate=dilation_rate,
-                      padding='same')(input_tensor)
-    if batchnorm:
-        x = layers.BatchNormalization()(x)
-    x = layers.Activation('relu')(x)
-
-    if 0.0 < dropout < 1.0:
-        x = layers.Dropout(dropout)(x)
-
-    return x
+from tensorflow.math import scalar_mul
 
 
 def resolve_generic_params(layer_chars, filters, kernel_size, strides, dilation_rate, dropout,
@@ -100,6 +83,25 @@ def resolve_generic_params(layer_chars, filters, kernel_size, strides, dilation_
 
 
 class GenericBlock:
+    """
+    layer_chars is a string seperated by spaces, or a list of string. Every string item represents a block.
+    Each character represents a different keras.layer.
+    skip_tensor is required if p or n is provided. Only one p or n may exist.
+    n_filters, kernel_size, strides, dilation_rate, dropout can be scalar/Tuple values or a list of scalar/Tuples.
+    The length of these lists must be equal to the number of blocks.
+    Maxpool and Upsampling layers are hard coded to x2 sampling
+
+    c Conv2D \n
+    u Upsampling2D \n
+    t Conv2DTranspose\n
+    d Dropout\n
+    a Activation\n
+    m Maxpool2D\n
+    p Plus\n
+    n Co(n)cat\n
+    b Batchnormalization\n
+
+    """
 
     def __init__(self,
                  layer_chars='nca',
@@ -189,115 +191,18 @@ class GenericBlock:
         return x
 
 
-
-
-def generic_block(input_tensor,
-                  layer_chars,
-                  n_filters=1,
-                  skip_tensor=None,
-                  kernel_size=3,
-                  strides=1,
-                  dilation_rate=1,
-                  dropout=0.0,
-                  activation='relu',
-                  level_id=0,
-                  **kwargs):
-    """
-    layer_chars is a string seperated by spaces, or a list of string. Every string item represents a block.
-    Each character represents a different keras.layer.
-    skip_tensor is required if p or n is provided. Only one p or n may exist.
-    n_filters, kernel_size, strides, dilation_rate, dropout can be scalar/Tuple values or a list of scalar/Tuples.
-    The length of these lists must be equal to the number of blocks.
-    Maxpool and Upsampling layers are hard coded to x2 sampling
-
-    c Conv2D \n
-    u Upsampling2D \n
-    t Conv2DTranspose\n
-    d Dropout\n
-    a Activation\n
-    m Maxpool2D\n
-    p Plus\n
-    n Co(n)cat\n
-    b Batchnormalization\n
-
-    """
-    (layer_chars_list,
-     n_filters_list,
-     kernel_size_list,
-     strides_list,
-     dilation_rate_list,
-     dropout_list,
-     activation_list) = resolve_generic_params(layer_chars,
-                                               n_filters,
-                                               kernel_size,
-                                               strides,
-                                               dilation_rate,
-                                               dropout,
-                                               activation)
-
-    x = input_tensor
-    for chars, f, k, s, dr, d, a in zip(layer_chars_list,
-                                        n_filters_list,
-                                        kernel_size_list,
-                                        strides_list,
-                                        dilation_rate_list,
-                                        dropout_list,
-                                        activation_list):
-        for char in chars:
-            if char == 'c':
-                x = layers.Conv2D(filters=f * 2 ** level_id,
-                                  kernel_size=k,
-                                  kernel_initializer='he_normal',
-                                  strides=s,
-                                  dilation_rate=dr,
-                                  padding='same')(x)
-            if char == 'u':
-                x = layers.UpSampling2D(size=(2, 2))(x)  # perhaps use s instead of 2?
-            if char == 't':
-                x = layers.Conv2DTranspose(filters=f * 2 ** level_id,
-                                           kernel_size=k,
-                                           strides=s,
-                                           dilation_rate=dr,
-                                           kernel_initializer='glorot_uniform',
-                                           padding='same')(x)
-            if char == 'd':
-                if 0.0 < d < 1.0:
-                    x = layers.Dropout(d)(x)
-            if char == 'a':
-                x = layers.Activation(a)(x)
-            if char == 'm':
-                x = layers.MaxPooling2D((2, 2), strides=2)(x)  # perhaps use s instead of 2?
-            if char == 'p':
-                # x = x + skip_tensor
-                x = layers.Add()([x, skip_tensor])
-            if char == 'n':
-                x = layers.concatenate([x, skip_tensor])
-            if char == 'b':
-                x = layers.BatchNormalization()(x)
-            if char == 's':
-                x = layers.SeparableConv2D(filters=f * 2 ** level_id,
-                                           kernel_size=k,
-                                           depth_multiplier=1,
-                                           kernel_initializer='he_normal',
-                                           strides=s,
-                                           dilation_rate=dr,
-                                           padding='same')(x)
-
-    return x
-
-
 class GenericUnet:
 
     def __init__(self,
                  height=3,  # at least 2
                  prev_unet_down_tensors=None,
-                 concat_multiplier=1,
+                 concat_multiplier=1.0,
                  level_block=GenericBlock(filters=64),
                  ):
         self.height = height
         self.prev_unet_down_tensors = prev_unet_down_tensors
         self.level_block = level_block
-        self.concat_multiplier = concat_multiplier
+        self.concat_multiplier = float(concat_multiplier)
         self.down_tensors = [None] * (self.height - 1)
         self.output_tensor = None
 
@@ -311,6 +216,7 @@ class GenericUnet:
             if self.prev_unet_down_tensors is not None:
                 x = layers.Add()([x, self.prev_unet_down_tensors[level]])
             self.down_tensors[level] = x * self.concat_multiplier
+            #self.down_tensors[level] = scalar_mul(self.concat_multiplier, x)
             x = layers.MaxPooling2D((2, 2), strides=2)(x)
 
         x = self.level_block(x, level=level + 1, direction='mid')
@@ -322,30 +228,3 @@ class GenericUnet:
         self.output_tensor = x
         return x
 
-
-def generic_unet(input_tensor,
-                 height,  # at least 2
-                 n_filters_top,
-                 down_kwargs={},
-                 mid_kwargs={},
-                 up_kwargs={},
-                 down_func=generic_block,
-                 mid_func=generic_block,
-                 up_func=generic_block,
-                 dropout=0.0):
-    down_blocks = [None] * (height - 1)
-    x = input_tensor
-
-    for level_id in range(0, height - 1, 1):
-        x = down_func(x, n_filters=n_filters_top, level_id=level_id, **down_kwargs)
-        down_blocks[level_id] = x
-        x = layers.MaxPooling2D((2, 2), strides=2)(x)
-        x = generic_block(x, 'd', dropout=dropout)
-
-    if mid_func is not None:
-        x = mid_func(x, n_filters=n_filters_top, level_id=level_id + 1, **mid_kwargs)
-
-    for level_id in range(level_id, -1, -1):
-        x = up_func(x, n_filters=n_filters_top, level_id=level_id, skip_tensor=down_blocks[level_id], **up_kwargs)
-
-    return x

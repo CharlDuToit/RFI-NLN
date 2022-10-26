@@ -6,7 +6,7 @@ import time
 from models import RNET
 
 from utils.plotting  import  (generate_and_save_images,
-                             generate_and_save_training)
+                              save_training_metrics)
 
 from utils.training import print_epoch,save_checkpoint
 from model_config import *
@@ -38,6 +38,8 @@ def train_step(model, x, y):
 
 def train(rnet,train_dataset,train_images, train_masks, test_images,test_labels,test_masks,args,verbose=True,save=True):
     rnet_loss= []
+    dir_path = 'outputs/{}/{}/{}'.format(args.model, args.anomaly_class, args.model_name)
+
     train_mask_dataset = tf.data.Dataset.from_tensor_slices(train_masks.astype('float32')).shuffle(BUFFER_SIZE, seed=42).batch(BATCH_SIZE)
     train_data_dataset = tf.data.Dataset.from_tensor_slices(train_images).shuffle(BUFFER_SIZE, seed=42).batch(BATCH_SIZE)
     for epoch in range(args.epochs):
@@ -51,15 +53,21 @@ def train(rnet,train_dataset,train_images, train_masks, test_images,test_labels,
                                  image_batch[:25,...],
                                  'RNET',
                                  args)
-        save_checkpoint(rnet,epoch, args,'RNET','rnet')
+        #save_checkpoint(rnet,epoch, args,'RNET','rnet')
+        save_checkpoint(dir_path, rnet, 'RNET', epoch)
+
 
         rnet_loss.append(auto_loss)
 
-        print_epoch('RNET',epoch,time.time()-start,{'RNET Loss':auto_loss.numpy()},None)
+        #print_epoch('RNET',epoch,time.time()-start,{'RNET Loss':auto_loss.numpy()},None)
+        print_epoch('RNET', epoch, time.time() - start, auto_loss.numpy(), 'loss')
 
-    generate_and_save_training([rnet_loss],
-                                ['rnet loss'],
-                                'RNET',args)
+
+    save_checkpoint(dir_path, rnet, 'RNET')
+    save_training_metrics(dir_path, rnet_loss, 'RNET loss')
+    #save_training_metrics_image([rnet_loss],
+    #                            ['rnet loss'],
+    #                            'RNET', args)
     generate_and_save_images(rnet,epoch,image_batch[:25,...],'RNET',args)
 
     return rnet

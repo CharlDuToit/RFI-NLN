@@ -79,6 +79,7 @@ def get_error(model_type,
         np.array
 
     """
+    #error = get_error('AE', test_images, x_hat, mean=False)
     
     if ((model_type == 'AE') or 
             (model_type == 'AE-SSIM') or

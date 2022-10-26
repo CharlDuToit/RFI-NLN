@@ -4,10 +4,10 @@ import os
 from models import  Autoencoder
 
 from utils.plotting  import  (generate_and_save_images,
-                             generate_and_save_training)
+                              save_training_metrics)
 
 from utils.training import print_epoch,save_checkpoint
-from model_config import *
+#from model_config import *
 from .helper import end_routine
 from inference import infer
 

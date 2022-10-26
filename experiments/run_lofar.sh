@@ -32,7 +32,7 @@ do
 						  -patch_stride_y $patch \
 						  -data LOFAR\
 						  -data_path /home/ee487519/DatasetsAndConfig/Given/43_Mesarcik_2022/ \
-						  -neighbors 20\
+						  -neighbours 20\
 						  -algorithm knn\
 						  -seed $d$seed | tee -a lofar.log 
 		done 

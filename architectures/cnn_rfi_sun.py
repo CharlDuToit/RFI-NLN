@@ -6,7 +6,7 @@ import time
 from models import CNN_RFI_SUN
 
 from utils.plotting import (generate_and_save_images,
-                            generate_and_save_training)
+                            save_training_metrics)
 
 from utils.training import print_epoch, save_checkpoint
 from model_config import *
@@ -34,6 +34,8 @@ def train_step(model, x, y):
 def train(cnn_rfi_sun, train_dataset, train_images, train_masks, test_images, test_labels, test_masks, args, verbose=True,
           save=True):
     cnn_rfi_sun_loss = []
+    dir_path = 'outputs/{}/{}/{}'.format(args.model, args.anomaly_class, args.model_name)
+
     # might have to remove reshape
     train_mask_dataset = tf.data.Dataset.from_tensor_slices(train_masks.astype('float32').reshape((-1,1,1,2)).transpose(0,1,3,2)).shuffle(BUFFER_SIZE,seed=42).batch(BATCH_SIZE)
     train_data_dataset = tf.data.Dataset.from_tensor_slices(train_images.reshape((-1,1,1,2)).transpose(0,1,3,2)).shuffle(BUFFER_SIZE, seed=42).batch(BATCH_SIZE)
@@ -49,15 +51,22 @@ def train(cnn_rfi_sun, train_dataset, train_images, train_masks, test_images, te
         #                         image_batch[:25, ...],
         #                         'CNN_RFI_SUN',
         #                         args)
-        save_checkpoint(cnn_rfi_sun, epoch, args, 'CNN_RFI_SUN', 'cnn_rfi_sun')
+        #save_checkpoint(cnn_rfi_sun, epoch, args, 'CNN_RFI_SUN', 'cnn_rfi_sun')
+        save_checkpoint(dir_path, cnn_rfi_sun, 'CNN_RFI_SUN', epoch)
+
 
         cnn_rfi_sun_loss.append(auto_loss)  # auto_loss for the last batch
 
-        print_epoch('CNN_RFI_SUN', epoch, time.time() - start, {'CNN_RFI_SUN Loss': auto_loss.numpy()}, None)
+        #print_epoch('CNN_RFI_SUN', epoch, time.time() - start, {'CNN_RFI_SUN Loss': auto_loss.numpy()}, None)
+        print_epoch('CNN_RFI_SUN', epoch, time.time() - start, auto_loss.numpy(), 'loss')
 
-    generate_and_save_training([cnn_rfi_sun_loss],
-                               ['cnn_rfi_sun loss'],
-                               'CNN_RFI_SUN', args)
+    #save_training_metrics_image([cnn_rfi_sun_loss],
+    #                            ['cnn_rfi_sun loss'],
+    #                           'CNN_RFI_SUN', args)
+    save_checkpoint(dir_path, cnn_rfi_sun, 'CNN_RFI_SUN')
+
+    save_training_metrics(dir_path, cnn_rfi_sun_loss, 'CNN_RFI_SUN loss')
+
     #generate_and_save_images(cnn_rfi_sun, epoch, image_batch[:25, ...], 'CNN_RFI_SUN', args)
 
     return cnn_rfi_sun

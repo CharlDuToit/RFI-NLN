@@ -2,7 +2,7 @@
 import sys
 sys.path.insert(1,'../..')
 
-from .patches import get_patched_dataset, get_patches, reconstruct, reconstruct_latent_patches
+from .patches import get_patches, reconstruct, reconstruct_latent_patches # get_patched_dataset
 from .lofar import get_lofar_data, _random_crop
 from .hera import get_hera_data
 from .processor import process, resize, rgb2gray, corrupt_masks

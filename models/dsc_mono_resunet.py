@@ -6,9 +6,9 @@ from .generic_builder import GenericUnet, GenericBlock
 tf.keras.backend.set_floatx('float32')
 
 
-def DSC_DUAL_RESUNET(args):
+def DSC_MONO_RESUNET(args):
     """
-    Charl's implementation of article:
+    Charl's implementation of article below, but with one UNET
     46 DSC based Dual-Resunet for radio frequency interference identification
     Yan-Jun Zhang, Yan-Zuo Li, Jun Cheng,Yi-Hua Yan
     2021 September
@@ -21,13 +21,12 @@ def DSC_DUAL_RESUNET(args):
     dsc_unet_0 = GenericUnet(height, level_block=res_block)
     x = dsc_unet_0(input_data)
 
-    # perhaps remove these 2 lines?
-    x = layers.Conv2D(filters=2, kernel_size=1, strides=1, padding='same')(x)
-    x = layers.Activation('sigmoid')(x)
+    #x = layers.Conv2D(filters=2, kernel_size=1, strides=1, padding='same')(x)
+    #x = layers.Activation('sigmoid')(x)
 
-    dsc_unet_1 = GenericUnet(height, level_block=res_block, concat_multiplier=1.8,
-                             prev_unet_down_tensors=dsc_unet_0.down_tensors)
-    x = dsc_unet_1(x)
+    #dsc_unet_1 = GenericUnet(height, level_block=res_block, concat_multiplier=1.8,
+    #                         prev_unet_down_tensors=dsc_unet_0.down_tensors)
+    #x = dsc_unet_1(x)
 
     #x = GenericBlock('c ca', filters=[args.filters, 1], kernel_size=[3, 1], activation='sigmoid')(x)
     x = GenericBlock('ca', filters=1, kernel_size=1, activation='sigmoid')(x)

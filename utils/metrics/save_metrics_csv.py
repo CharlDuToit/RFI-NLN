@@ -2,20 +2,20 @@ import tensorflow as tf
 import numpy as np
 import os
 import pandas as pd
-from sklearn.metrics import roc_curve, auc, average_precision_score, roc_auc_score
-from math import isnan
-from inference import infer, get_error
-from utils.data import reconstruct
+#from sklearn.metrics import roc_curve, auc, average_precision_score, roc_auc_score
+#from math import isnan
+#from inference import infer, get_error
+#from utils.data import reconstruct
 
 
-def save_metrics(model_type,
-                 train_data,
-                 test_masks,
-                 test_masks_orig,
-                 alpha,
-                 neighbour,
-                 args,
-                 **kwargs):
+def save_metrics_csv(model_type,
+                     train_data,
+                     test_masks,
+                     test_masks_orig,
+                     alpha,
+                     neighbour,
+                     args,
+                     **kwargs):
     """
         Either appends or saves a new .csv file with the top K 
 
@@ -72,8 +72,14 @@ def save_metrics(model_type,
                                    'COMBINED_F1_AO',
                                    'COMBINED_F1_TRUE',
 
-                                   'flops',
-                                   'time'])
+                                   'Flops',
+                                   'Time',
+                                   'Trainable_params'
+                                   'Nontrainable_params'
+                                   'Filters',
+                                   'Levels',
+                                   'Level_blocks',
+                                   'Model_config'])
     else:
         df = pd.read_csv('outputs/results_{}_{}.csv'.format(args.data,
                                                             args.seed))
@@ -121,8 +127,94 @@ def save_metrics(model_type,
                     'COMBINED_F1_TRUE': kwargs['combined_true_f1'],
 
                     'flops': kwargs['flops'],
-                    'time': kwargs['tot_time']
+                    'time': kwargs['tot_time'],
+                    'trainable_params': kwargs['trainable_params'],
+                    'nontrainable_params': kwargs['nontrainable_params'],
+                    'filters': args.filters,
+                    'level_blocks': args.level_blocks,
+                    'model_config': args.model_config
                     }, ignore_index=True)
 
     df.to_csv('outputs/results_{}_{}.csv'.format(args.data,
                                                  args.seed), index=False)
+
+
+def save_results_csv(data_name, seed, results_dict):
+    none_dict = empty_dict()
+    save_dict = {**none_dict, **results_dict}
+    for k in save_dict.keys():
+        save_dict[k] = str(save_dict[k] )
+    #index = [i for i in range(len(save_dict))]
+    save_df = pd.DataFrame([save_dict])
+    dir_path = 'outputs/results_{}_{}.csv'.format(data_name, seed)
+    if not os.path.exists(dir_path):
+        save_df.to_csv(dir_path, index=False)
+    else:
+        df = pd.read_csv(dir_path)
+        df = pd.concat([df, save_df])
+        df.to_csv(dir_path, index=False)
+
+    #perc = round(((np.sum(test_masks) - np.sum(test_masks_orig)) / np.prod(test_masks_orig.shape)), 3)
+
+
+def empty_dict():
+    return {
+        'model': None,
+        'name': None,
+        'data': None,
+        'anomaly_class': None,
+        'anomaly_type': None,
+        'rfi_threshold': None,
+        'ood_rfi': None,
+        'lofar_subset': None,
+        'num_training': None,
+
+        'raw_input_shape': None,
+        'num_patches': None,
+        'patch_x': None,
+        'patch_y': None,
+        'std_plus': None,
+        'std_minus': None,
+        'per_image': None,
+        'combine_min_std_plus' : None,
+
+        'latent_dim': None,
+        'alpha': None,
+        'neighbour': None,
+        'algorithm': None,
+
+        'model_config': None,
+        'filters': None,
+        'height': None,
+        'level_blocks': None,
+
+        'trainable_params': None,
+        'nontrainable_params': None,
+
+        'flops_patch': None,
+        'time_patch': None,
+        'flops_image': None,
+        'time_image': None,
+
+        'auroc': None,
+        'auprc': None,
+        'f1': None,
+
+        'ae_auroc': None,
+        'ae_auprc': None,
+        'ae_f1': None,
+
+        'nln_auroc': None,
+        'nln_auprc': None,
+        'nln_f1': None,
+
+        'dists_auroc': None,
+        'dists_auprc': None,
+        'dists_f1': None,
+
+        'combined_auroc': None,
+        'combined_auprc': None,
+        'combined_f1': None,
+
+
+    }

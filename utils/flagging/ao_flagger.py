@@ -2,7 +2,7 @@ import aoflagger as aof
 import numpy as np 
 from tqdm import tqdm
 
-def flag_data(data, args):
+def flag_data(data, data_name, rfi_threshold):
     """
         Applies AOFlagger to simulated HERA visibilities
 
@@ -19,10 +19,10 @@ def flag_data(data, args):
     mask = np.empty(data[...,0].shape, dtype=np.bool)
 
     aoflagger = aof.AOFlagger()
-    if args.data == 'HERA':
-        strategy = aoflagger.load_strategy_file('utils/flagging/stratergies/hera_{}.lua'.format(args.rfi_threshold))
-    elif args.data == 'LOFAR':
-        strategy = aoflagger.load_strategy_file('utils/flagging/stratergies/lofar-default-{}.lua'.format(args.rfi_threshold))
+    if data_name == 'HERA':
+        strategy = aoflagger.load_strategy_file('utils/flagging/stratergies/hera_{}.lua'.format(rfi_threshold))
+    elif data_name == 'LOFAR':
+        strategy = aoflagger.load_strategy_file('utils/flagging/stratergies/lofar-default-{}.lua'.format(rfi_threshold))
 
     # LOAD data into AOFlagger structure
     for indx in tqdm(range(len(data))):

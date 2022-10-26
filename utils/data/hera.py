@@ -24,5 +24,4 @@ def get_hera_data(args):
     train_data[train_data==np.inf] = np.finfo(train_data.dtype).max
     test_data[test_data==np.inf] = np.finfo(test_data.dtype).max
 
-
     return (train_data.astype('float32'), test_data.astype('float32'),  train_masks, test_masks)

@@ -31,7 +31,7 @@ do
 								  -patch_y $patch \
 								  -patch_stride_x $patch \
 								  -patch_stride_y $patch \
-								  -neighbors 20\
+								  -neighbours 20\
 								  -algorithm knn\
 								  -seed $d$seed | tee -a hera.log 
 		done

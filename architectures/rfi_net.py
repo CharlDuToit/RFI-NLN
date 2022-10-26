@@ -6,7 +6,7 @@ import time
 from models import RFI_NET 
 
 from utils.plotting  import  (generate_and_save_images,
-                             generate_and_save_training)
+                              save_training_metrics)
 
 from utils.training import print_epoch,save_checkpoint
 from model_config import *
@@ -14,6 +14,7 @@ from .helper import end_routine
 from inference import infer
 
 optimizer = tf.keras.optimizers.Adam()
+
 
 @tf.function
 def train_step(model, x, y):
@@ -31,6 +32,8 @@ def train_step(model, x, y):
 
 def train(rfi_net,train_dataset,train_images, train_masks, test_images,test_labels,test_masks,args,verbose=True,save=True):
     rfi_net_loss= []
+    dir_path = 'outputs/{}/{}/{}'.format(args.model, args.anomaly_class, args.model_name)
+
     train_mask_dataset = tf.data.Dataset.from_tensor_slices(train_masks.astype('float32')).shuffle(BUFFER_SIZE, seed=42).batch(BATCH_SIZE)
     train_data_dataset = tf.data.Dataset.from_tensor_slices(train_images).shuffle(BUFFER_SIZE, seed=42).batch(BATCH_SIZE)
     for epoch in range(args.epochs):
@@ -44,15 +47,22 @@ def train(rfi_net,train_dataset,train_images, train_masks, test_images,test_labe
                                  image_batch[:25,...],
                                  'RFI_NET',
                                  args)
-        save_checkpoint(rfi_net,epoch, args,'RFI_NET','rfi_net')
+        #save_checkpoint(rfi_net,epoch, args,'RFI_NET','rfi_net')
+        save_checkpoint(dir_path, rfi_net, 'RFI_NET', epoch)
+
 
         rfi_net_loss.append(auto_loss)
 
-        print_epoch('RFI_NET',epoch,time.time()-start,{'RFI_NET Loss':auto_loss.numpy()},None)
+        #print_epoch('RFI_NET',epoch,time.time()-start,{'RFI_NET Loss':auto_loss.numpy()},None)
+        print_epoch('RFI_NET', epoch, time.time() - start, auto_loss.numpy(), 'loss')
 
-    generate_and_save_training([rfi_net_loss],
-                                ['rfi_net loss'],
-                                'RFI_NET',args)
+    save_checkpoint(dir_path, rfi_net, 'RFI_NET')
+
+    save_training_metrics(dir_path, rfi_net_loss, 'RFI_NET loss')
+
+    #save_training_metrics_image([rfi_net_loss],
+    #                            ['rfi_net loss'],
+    #                            'RFI_NET', args)
     generate_and_save_images(rfi_net,epoch,image_batch[:25,...],'RFI_NET',args)
 
     return rfi_net

@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 from tensorflow.keras import layers
 # from model_config import n_layers, n_filters
-from .helper import generic_block, generic_unet, GenericBlock, GenericUnet
+from .generic_builder import GenericBlock, GenericUnet
 
 tf.keras.backend.set_floatx('float32')
 
@@ -10,7 +10,7 @@ tf.keras.backend.set_floatx('float32')
 def RFINET_downblock(input_tensor, n_filters, kernel_size=3, batchnorm=True, stride=(1, 1)):
     # first layer
     x0 = layers.Conv2D(filters=n_filters,
-                       kernel_size=(kernel_size, kernel_size), \
+                       kernel_size=(kernel_size, kernel_size),
                        kernel_initializer='he_normal',
                        strides=stride,
                        padding='same')(input_tensor)
@@ -19,7 +19,7 @@ def RFINET_downblock(input_tensor, n_filters, kernel_size=3, batchnorm=True, str
     x0 = layers.Activation('relu')(x0)
 
     x1 = layers.Conv2D(filters=2 * n_filters,
-                       kernel_size=(kernel_size, kernel_size), \
+                       kernel_size=(kernel_size, kernel_size),
                        kernel_initializer='he_normal',
                        strides=stride,
                        padding='same')(x0)
@@ -27,7 +27,7 @@ def RFINET_downblock(input_tensor, n_filters, kernel_size=3, batchnorm=True, str
     x1 = layers.Activation('relu')(x1)
 
     x2 = layers.Conv2D(filters=2 * n_filters,
-                       kernel_size=(kernel_size, kernel_size), \
+                       kernel_size=(kernel_size, kernel_size),
                        kernel_initializer='he_normal',
                        strides=stride,
                        padding='same')(x1)
@@ -144,49 +144,20 @@ def RFI_NET_mesarcik(args, n_filters=32, dropout=0.05, batchnorm=True):
     return model
 
 
-def RFI_NET_gen_old(args, n_filters=32, height=5, dropout=0.05):
-    """
-    Charls remplementation of Mesarciks version of RFI_NET
-    27 Deep residual detection of Radio Frequency Interference for FAST
-    Zhicheng Yang, Ce Yu, Jian Xiao, and Bo Zhang
-    2020
-    """
-    input_data = tf.keras.Input(args.input_shape, name='data')
-    max_height = np.floor(np.log2(args.input_shape[0])).astype(int)  # - 1  # why -1?  minimum tensor size 2x2
-    height = max_height if height is None else np.minimum(height, max_height)
-
-    x = layers.Conv2D(filters=n_filters,
-                      kernel_size=3,
-                      kernel_initializer='he_normal',
-                      strides=1,
-                      padding='same')(input_data)
-
-    x = generic_unet(x,
-                     height,
-                     n_filters,
-                     dropout=dropout,
-                     down_func=down_func,
-                     mid_func=down_func,
-                     up_func=up_func)
-
-    x = layers.Conv2D(1, (1, 1), activation='sigmoid')(x)
-    model = tf.keras.Model(inputs=[input_data], outputs=[x])
-    return model
-
 def RFI_NET(args):
     input_data = tf.keras.Input(args.input_shape, name='data')
     max_height = np.floor(np.log2(args.input_shape[0])).astype(int)  # - 1  # why -1?  minimum tensor size 2x2
     height = max_height if args.height is None else np.minimum(args.height, max_height)
 
-    x = layers.Conv2D(filters=args.filters,
-                      kernel_size=3,
-                      kernel_initializer='he_normal',
-                      strides=1,
-                      padding='same')(input_data)
-    level_block = RFINETBlock(filters=args.filters)
+    #x = GenericBlock('cba cba', args.filters, kernel_size=3, strides=1)(input_data) # look at table 1
+    x = input_data
+
+    level_block = RFINETBlock(filters=args.filters, dropout=args.dropout)  # note *2
     x = GenericUnet(height, level_block=level_block)(x)
 
-    x = layers.Conv2D(1, (1, 1), activation='sigmoid')(x)
+    # removed batchnorm from table 1, i.e. no longer cba
+    x = GenericBlock('ca', 1, activation='sigmoid', kernel_size=1, strides=1)(x)  # look at table 1
+    #x = layers.Conv2D(1, (1, 1), activation='sigmoid')(x) # table 1 used 3x3 conv with softmax activation
     model = tf.keras.Model(inputs=[input_data], outputs=[x])
     return model
 
@@ -194,56 +165,14 @@ def RFI_NET(args):
 class RFINETBlock(GenericBlock):
 
     def __call__(self, input_tensor, level=0, skip_tensor=None, direction='down'):
-        f_mult = 2 if direction == 'down' or direction == 'mid' else 0.5
-        filters = self.filters,
-        n = GenericBlock('n')(input_tensor, skip_tensor=skip_tensor)
-        x = GenericBlock('cba cba cb',
-                         [filters, filters*f_mult, filters*f_mult])(n, level=level)
-        x = GenericBlock('cb p ba',
-                         [filters, filters*f_mult, filters*f_mult])(n, level=level, skip_tensor=x)
+        filters = self.filters
+        if direction == 'up':
+            #n = GenericBlock('ban')(input_tensor, skip_tensor=skip_tensor)
+            n = GenericBlock('n')(input_tensor, skip_tensor=skip_tensor)
+        #elif (direction == 'down' and level > 0) or direction == 'mid':
+            #n = GenericBlock('d', dropout=self.dropout)(input_tensor)  # dropout
+        else:
+            n = input_tensor
+        x = GenericBlock('cba cba cb', filters)(n, level=level)
+        x = GenericBlock('cb p ba', filters)(n, level=level, skip_tensor=x)  # check filters
         return x
-
-
-def up_func(input_tensor, n_filters, level_id, skip_tensor, kernel_size=3, strides=1):
-
-    n = generic_block(input_tensor,
-                      'tn',
-                      n_filters,
-                      kernel_size=3,
-                      strides=2,
-                      skip_tensor=skip_tensor,
-                      level_id=level_id)
-
-    x = generic_block(n,
-                      'cba cba cb',
-                      [n_filters, n_filters // 2, n_filters // 2],
-                      kernel_size=kernel_size,
-                      strides=strides,
-                      level_id=level_id)
-
-    x = generic_block(n,
-                      'cb p ba',
-                      n_filters // 2,
-                      skip_tensor=x,
-                      kernel_size=1,
-                      strides=strides,
-                      level_id=level_id)
-    return x
-
-
-def down_func(input_tensor, n_filters, kernel_size=3, strides=1, level_id=0):
-
-    x = generic_block(input_tensor,
-                      'cba cba cb',
-                      [n_filters, n_filters * 2, n_filters * 2],
-                      kernel_size=kernel_size,
-                      strides=strides,
-                      level_id=level_id)
-    x = generic_block(input_tensor,
-                      'cb p ba',
-                      n_filters * 2,
-                      skip_tensor=x,
-                      kernel_size=1,
-                      strides=strides,
-                      level_id=level_id)
-    return x

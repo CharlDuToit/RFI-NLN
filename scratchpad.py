@@ -4,11 +4,12 @@ from utils import args
 from utils.profiling import *
 from utils.hardcoded_args import *
 from data import *
+from utils.data.patches import get_patches, reconstruct
 
 #from models import (Autoencoder,
                    #Discriminator_x)
 
-from architectures.helper import end_routine
+from architectures.generic_architecture import end_routine
 
 class Args:
     input_shape = (32, 32, 1)
@@ -122,10 +123,65 @@ def load_model():
     end_routine(train_data, test_data, test_labels, test_masks, test_masks_orig, [unet], 'UNET',
                 args.args)
 
+def save_all_summaries():
+    args.args = set_hera_args(args.args)
+    args.args.model_config = 'common'
+    args.args = resolve_model_config_args(args.args)
+    unet = UNET(args.args)
+    save_summary_to_folder(unet, 'model_summaries', args.args)
+
+
+def test_patches_arb():
+    new_shape = (128, 512, 1)
+    data = np.random.random((1,128,512,1))
+    patch_x, patch_stride_x = 32, 32
+    patch_y, patch_stride_y = 8, 8
+    p_size = (1, patch_x, patch_y, 1)
+    s_size = (1, patch_stride_x, patch_stride_y, 1)
+    rate = (1, 1, 1, 1)
+
+    patches = get_patches_arbitrary(data, None, p_size, s_size, rate, 'VALID')
+    #patches = np.random.random(((256, 32, 8, 1)))
+
+    recon = reconstruct(patches, new_shape, patch_x, patch_y)
+
+    print(recon.shape == data.shape)
+    print(np.allclose(recon, data))
+
+def test_patches():
+    new_shape = (4, 4, 1)
+    data = np.random.random((2,4,4,1))
+    data[0, 0:2, 0:2, 0] = 0
+    data[0, 0:2, 2:4, 0] = 1
+    data[0, 2:4, 0:2, 0] = 2
+    data[0, 2:4, 2:4, 0] = 3
+    data[1, 0:2, 0:2, 0] = 4
+    data[1, 0:2, 2:4, 0] = 5
+    data[1, 2:4, 0:2, 0] = 6
+    data[1, 2:4, 2:4, 0] = 7
+    patch_x, patch_stride_x = 2, 2
+    patch_y, patch_stride_y = 2, 2
+    p_size = (1, patch_x, patch_y, 1)
+    s_size = (1, patch_stride_x, patch_stride_y, 1)
+    rate = (1, 1, 1, 1)
+
+    patches = get_patches(data, p_size, s_size, rate, 'VALID')
+    #patches = np.random.random(((256, 32, 8, 1)))
+
+    #class Args:
+    #    patch_x=2
+    #    patch_y=2
+    #    data = 'HERA'
+    #recon = reconstruct(patches, Args)
+
+    #print(recon.shape == data.shape)
+    #print(np.allclose(recon, data))
 
 if __name__ == '__main__':
   #  load_model()
-    save_summ()
+    #save_all_summaries()
+    test_patches_arb()
+    #save_summ()
     #save_dsc_dual_resunet()
     #freeze_and_flops()
     #auto_test()

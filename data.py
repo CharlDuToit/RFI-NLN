@@ -19,6 +19,7 @@ def load_hera(args):
     """
     (train_data, test_data, 
          train_masks, test_masks) = get_hera_data(args)
+    # train_data, train_masks, test_data, test_masks = get_lofar_data(args)
 
 
     if args.limit is not None:
@@ -28,8 +29,8 @@ def load_hera(args):
 
     test_masks_orig = copy.deepcopy(test_masks)
     if args.rfi_threshold is not None:
-        test_masks = flag_data(test_data,args)
-        train_masks = flag_data(train_data,args)
+        test_masks = flag_data(test_data, args.data, args.rfi_threshold)
+        train_masks = flag_data(train_data, args.data, args.rfi_threshold)
         test_masks = np.expand_dims(test_masks,axis=-1) 
         train_masks = np.expand_dims(train_masks,axis=-1) 
 
@@ -50,14 +51,14 @@ def load_hera(args):
         s_size = (1,args.patch_stride_x, args.patch_stride_y, 1)
         rate = (1,1,1,1)
 
-        train_data = get_patches(train_data, None, p_size,s_size,rate,'VALID')
-        train_masks = get_patches(train_masks.astype('int'), None, p_size,s_size,rate,'VALID').astype(np.bool) #Charl: does not like bool input
+        train_data = get_patches(train_data, p_size,s_size,rate,'VALID')
+        train_masks = get_patches(train_masks.astype('int'), p_size,s_size,rate,'VALID').astype(np.bool) #Charl: does not like bool input
        # train_masks = get_patches(train_masks, None, p_size, s_size, rate, 'VALID').astype(np.bool)
 
-        test_data = get_patches(test_data, None, p_size,s_size,rate,'VALID')
-        test_masks= get_patches(test_masks.astype('int') , None, p_size,s_size,rate,'VALID').astype(np.bool)
+        test_data = get_patches(test_data, p_size,s_size,rate,'VALID')
+        test_masks= get_patches(test_masks.astype('int'), p_size,s_size,rate,'VALID').astype(np.bool)
 
-        test_masks_orig = get_patches(test_masks_orig.astype('int') , None, p_size,s_size,rate,'VALID').astype(np.bool)
+        test_masks_orig = get_patches(test_masks_orig.astype('int'), p_size,s_size,rate,'VALID').astype(np.bool)
 
         train_labels = np.empty(len(train_data), dtype='object')
         train_labels[np.any(train_masks, axis=(1,2,3))] = args.anomaly_class
@@ -98,7 +99,7 @@ def load_lofar(args):
 
     if args.limit is not None:
         train_indx = np.random.permutation(len(train_data))[:args.limit]
-        test_indx = np.random.permutation(len(test_data))[:args.limit]
+        #test_indx = np.random.permutation(len(test_data))[:args.limit]
 
         train_data = train_data[train_indx]
         train_masks = train_masks[train_indx]
@@ -106,7 +107,7 @@ def load_lofar(args):
         #test_masks  = test_masks [test_indx]
 
     if args.rfi_threshold is not None:
-        train_masks = flag_data(train_data,args)
+        train_masks = flag_data(train_data, args.data, args.rfi_threshold)
         train_masks = np.expand_dims(train_masks,axis=-1) 
 
     _max = np.mean(test_data[np.invert(test_masks)])+95*np.std(test_data[np.invert(test_masks)])
@@ -125,10 +126,10 @@ def load_lofar(args):
         s_size = (1,args.patch_stride_x, args.patch_stride_y, 1)
         rate = (1,1,1,1)
 
-        train_data = get_patches(train_data, None, p_size,s_size,rate,'VALID')
-        test_data = get_patches(test_data, None, p_size,s_size,rate,'VALID')
-        train_masks = get_patches(train_masks.astype('int'), None, p_size,s_size,rate,'VALID').astype(np.bool)
-        test_masks= get_patches(test_masks.astype('int') , None, p_size,s_size,rate,'VALID').astype(np.bool)
+        train_data = get_patches(train_data, p_size,s_size,rate,'VALID')
+        test_data = get_patches(test_data, p_size,s_size,rate,'VALID')
+        train_masks = get_patches(train_masks.astype('int'), p_size,s_size,rate,'VALID').astype(np.bool)
+        test_masks= get_patches(test_masks.astype('int'), p_size,s_size,rate,'VALID').astype(np.bool)
 
         train_labels = np.empty(len(train_data), dtype='object')
         train_labels[np.any(train_masks, axis=(1,2,3))] = args.anomaly_class

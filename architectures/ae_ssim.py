@@ -6,7 +6,7 @@ from models import (Encoder,
                    Autoencoder)
 
 from utils.plotting  import  (generate_and_save_images,
-                             generate_and_save_training)
+                              save_training_metrics)
 
 from utils.training import print_epoch,save_checkpoint
 from model_config import *
@@ -33,6 +33,8 @@ def train_step(model, x):
 
 def train(ae,train_dataset,test_images,test_labels,args,verbose=True,save=True):
     ae_loss= []
+    dir_path = 'outputs/{}/{}/{}'.format(args.model, args.anomaly_class, args.model_name)
+
     for epoch in range(args.epochs):
         start = time.time()
         for image_batch in train_dataset:
@@ -43,15 +45,19 @@ def train(ae,train_dataset,test_images,test_labels,args,verbose=True,save=True):
                                  image_batch[:25,...],
                                  'AE_SSIM',
                                  args)
-        save_checkpoint(ae,epoch, args,'AE_SSIM','ae')
+        #save_checkpoint(ae,epoch, args,'AE_SSIM','ae')
+        save_checkpoint(dir_path, ae,'AE_SSIM', epoch)
 
         ae_loss.append(auto_loss)
 
-        print_epoch('AE_SSIM',epoch,time.time()-start,{'AE Loss':auto_loss.numpy()},None)
+        #print_epoch('AE_SSIM',epoch,time.time()-start,{'AE Loss':auto_loss.numpy()},None)
+        print_epoch('AE_SSIM', epoch, time.time() - start, auto_loss.numpy(), 'loss')
 
-    generate_and_save_training([ae_loss],
-                                ['ae loss'],
-                                'AE_SSIM',args)
+    save_checkpoint(dir_path, ae, 'AE_SSIM')
+    save_training_metrics(dir_path, ae_loss, 'AE_SSIM loss')
+    #save_training_metrics_image([ae_loss],
+    #                            ['ae loss'],
+    #                            'AE_SSIM', args)
     generate_and_save_images(ae,epoch,image_batch[:25,...],'AE_SSIM',args)
 
     return ae
@@ -60,7 +66,7 @@ def main(train_dataset,train_images,train_labels,test_images,test_labels, test_m
     ae = Autoencoder(args)
     ae = train(ae,train_dataset,test_images,test_labels,args)
     end_routine(train_images, test_images, test_labels, test_masks, test_masks_orig, [ae], 'AE_SSIM', args)
-    end_routine(train_images, test_images, test_labels, test_masks, [ae], 'AE_SSIM', args)
+    #end_routine(train_images, test_images, test_labels, test_masks, [ae], 'AE_SSIM', args)
 
     
 if __name__  == '__main__':
