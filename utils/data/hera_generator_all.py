@@ -65,7 +65,7 @@ def waterfall(sim, antpairpol=(0, 1, "xx"), figsize=(6, 3.5), dpi=200, title=Non
         set_title=False,
     )
     #plt.savefig('/tmp/temp/{}_{}_{}'.format(*antpairpol), dpi=300)
-    plt.savefig('/tmp/temp/{}_{}_{}'.format(*antpairpol), dpi=300)
+    plt.savefig('./temp/{}_{}_{}'.format(*antpairpol), dpi=300)
 
 
 def simulate(id_rfis):
@@ -103,13 +103,6 @@ def simulate(id_rfis):
             component_name="rfi_stations",
             seed="once",
         )
-        # sim.add(
-        #     "rfi_stations",
-        #     stations="/home/mmesarcik/anaconda3/envs/hera/lib/python3.7/site-packages/hera_sim/data/{}".format(station_models[
-        #                                                                                                         np.random.randint(0,2)]),
-        #     component_name="rfi_stations",
-        #     seed="once",
-        # )
 
     if 'rfi_dtv' in id_rfis:
         sim.add(
@@ -155,7 +148,7 @@ def simulate(id_rfis):
     return sim
 
 
-def extract_data(sim, baselines, subset):
+def extract_data(sim, subset):
     """
         Extracts the visibilities at each randomly sampled baseline
 
@@ -170,36 +163,28 @@ def extract_data(sim, baselines, subset):
         np.array, np.array, np.array
 
     """
-    data, labels, masks = [], [], []
-    _pairs = sim.get_antpairpols()
-    auto_inds = np.array([i for i, p in enumerate(_pairs) if p[0] == p[1]])
-    corr_pairs = [p for p in _pairs if p[0] != p[1]]
+    amps, phases, masks = [], [], []
 
-    corr_inds = np.random.choice(range(len(corr_pairs, )), baselines,
-                                 replace=False)  # sample random baselines given by "baselines"
-    inds = np.concatenate([auto_inds, corr_inds], axis=-1)
-
-    for ind in inds:
-        pairs = _pairs[ind]
-        data_temp = np.absolute(sim.get_data(pairs)).astype('float16')
-        data.append(data_temp)
+    for app in sim.get_antpairpols():
+        data_temp = np.absolute(sim.get_data(app)).astype('float16')
+        phase_temp = np.angle(sim.get_data(app)).astype('float16')
+        amps.append(data_temp)
+        phases.append(phase_temp)
 
         mask_temp = np.zeros(data_temp.shape, dtype='bool')
-        label_temp = ''
         for rfi in subset:
             try:
                 mask_temp = np.logical_or(mask_temp,
-                                          np.absolute(sim.get(rfi, pairs)) > 0)
-                label_temp = label_temp + '_{}'.format(rfi)
+                                          np.absolute(sim.get(rfi, app)) > 0)
             except Exception as e:
                 continue
         masks.append(mask_temp)
-        labels.append(label_temp[1:])
 
-    data = np.expand_dims(np.array(data), axis=-1)
+    amps = np.expand_dims(np.array(amps), axis=-1)
+    phases = np.expand_dims(np.array(phases), axis=-1)
     masks = np.expand_dims(np.array(masks), axis=-1)
 
-    return data, masks, labels
+    return amps, phases, masks
 
 
 def plot(sim):
@@ -232,30 +217,34 @@ def main():
         -------
         None
     """
-    n = 40
-    baselines = 7
+    n = 80 # 20
     rfis = ['rfi_stations', 'rfi_dtv', 'rfi_impulse', 'rfi_scatter']
-    for L in tqdm([1, 3]):  # to simulate IID and OOD RFI
-        for subset in itertools.combinations(rfis, L):
-            data = np.empty([2 * n * baselines, 2 ** 9, 2 ** 9, 1], dtype='float16') #560, 512, 512, 1
-            masks = np.empty([2 * n * baselines, 2 ** 9, 2 ** 9, 1], dtype='bool')
-            labels = np.empty([2 * n * baselines], dtype=object)
-            st, en = 0, 2 * baselines
-            for i in range(n):
-                sim = simulate(subset)
-                _data, _masks, _labels = extract_data(sim, baselines, subset)
-                data[st:en, ...], masks[st:en, ...], labels[st:en] = _data, _masks, _labels
-                st = en
-                en += 2 * baselines
 
-            # f_name = '/home/mmesarcik/data/HERA/HERA_{}_{}.pkl'.format(datetime.datetime.now().strftime("%d-%m-%Y"),'-'.join(subset))
-            f_name = '/home/ee487519/DatasetsAndConfig/Generated/HERA_Mesarcik/HERA_{}_{}.pkl'.format(
-                datetime.datetime.now().strftime("%d-%m-%Y"),
-                '-'.join(subset))
-            print('{} saved!'.format(f_name))
-            pickle.dump([data, labels, masks], open(f_name, 'wb'), protocol=4)
+    test_split = 0.2
 
-#stuff = np.load('HERA_31-10-2022_rfi_dtv.pkl', allow_pickle=True)st
+    amps = np.empty([n * 28, 2 ** 9, 2 ** 9, 1], dtype='float16') #560, 512, 512, 1
+    phases = np.empty([n * 28, 2 ** 9, 2 ** 9, 1], dtype='float16')
+    masks = np.empty([n * 28, 2 ** 9, 2 ** 9, 1], dtype='bool')
+    st, en = 0, 28
+    for i in tqdm(range(n)):
+        _sim = simulate(rfis)
+        _amps, _phases, _masks = extract_data(_sim, rfis)
+        amps[st:en, ...], phases[st:en, ...], masks[st:en] = _amps, _phases, _masks
+        st = en
+        en += 28
+
+    data = np.concatenate([amps, phases], axis=-1)
+    n_test = int(data.shape[0] * test_split)
+    test_data = data[:n_test]
+    train_data = data[n_test:]
+    test_masks = masks[:n_test]
+    train_masks = masks[n_test:]
+
+    f_name = '/home/ee487519/DatasetsAndConfig/Generated/HERA_Charl/HERA_{}_all.pkl'.format(
+        datetime.datetime.now().strftime("%d-%m-%Y"))
+    pickle.dump([train_data, train_masks, test_data, test_masks], open(f_name, 'wb'), protocol=4)
+    print('{} saved!'.format(f_name))
+
 
 if __name__ == '__main__':
     main()

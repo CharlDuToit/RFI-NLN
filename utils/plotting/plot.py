@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 
-def save_training_metrics(dir_path, metrics, metric_labels):
+def save_training_metrics(dir_path, metrics, metric_labels, file_name='training_metrics', ylabel='Loss'):
     """
         Shows line plot of the training curves
 
@@ -20,20 +20,25 @@ def save_training_metrics(dir_path, metrics, metric_labels):
         metrics = [metrics]
     if not isinstance(metric_labels, list):
         metric_labels = [metric_labels]
+    for epochs_metric, label in zip(metrics, metric_labels):
+        if len(epochs_metric) == 0:
+            metrics.remove(epochs_metric)
+            metric_labels.remove(label)
 
-    epochs = [e for e in range(len(metrics[0]))]
+    #epochs = [e for e in range(len(metrics[0]))]
     fig = plt.figure(figsize=(10,10))
-    for loss, label in zip(metrics, metric_labels):
-        plt.plot(epochs, loss, label=label)
+    for metric, label in zip(metrics, metric_labels):
+        epochs = [e for e in range(len(metric))]
+        plt.plot(epochs, metric, label=label)
     plt.legend()
     plt.xlabel('Epochs')
-    plt.ylabel('Loss')
-    plt.tight_layout()
-    plt.savefig('{}/training_metrics.png'.format(dir_path))
+    plt.ylabel(ylabel)
+    #plt.tight_layout()
+    plt.savefig('{}/{}.png'.format(dir_path, file_name))
     plt.close('all')
 
 
-def save_data_masks_inferred(dir_path, data, masks, masks_inferred, epoch=-1):
+def save_data_masks_inferred(dir_path, data, masks, masks_inferred, epoch=-1, thresh=-1):
     # masks_inferred = self.infer(data)
     fig, ax = plt.subplots(len(data), 4, figsize=(10, 20))
 
@@ -52,7 +57,11 @@ def save_data_masks_inferred(dir_path, data, masks, masks_inferred, epoch=-1):
     if epoch > -1:
         fig.savefig('{}/epochs/epoch_{:04d}_image.png'.format(dir_path, epoch))
     else:
-        fig.savefig('{}/data_masks_image.png'.format(dir_path))
+        if 0.0 < thresh < 1.0:
+            fig.savefig('{}/data_masks_image_thresh_{:.2f}.png'.format(dir_path, thresh))
+        else:
+            fig.savefig('{}/data_masks_image.png'.format(dir_path))
+
     plt.close('all')
 
 
@@ -238,3 +247,17 @@ def save_training_curves(model, args, test_images, test_labels, model_type):
                                                  args.anomaly_class,
                                                  args.model_name))
 
+
+def save_flops_metric(dir_path, flops, metrics, labels, params, file_name='flops_metric', ylabel='score'):
+    fig = plt.figure(figsize=(10, 10))
+    for flop, metric, label, p in zip(flops, metrics, labels, params):
+        flop /= 1e9
+        plt.scatter(flop, metric, label=label, s=3)
+        #plt.scatter(flop, f1, label=label, s=p) We need to rescale p first
+
+    plt.legend()
+    plt.xlabel('GFlops')
+    plt.ylabel(ylabel)
+    plt.tight_layout()
+    plt.savefig('{}/{}.png'.format(dir_path, file_name))
+    plt.close('all')

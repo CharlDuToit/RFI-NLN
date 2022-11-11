@@ -4,7 +4,7 @@ from tensorflow.math import scalar_mul
 
 
 def resolve_generic_params(layer_chars, filters, kernel_size, strides, dilation_rate, dropout,
-                           activation):
+                           activation, kernel_regularizer):
     if isinstance(layer_chars, str):
         layer_chars_list = layer_chars.split()
 
@@ -19,9 +19,9 @@ def resolve_generic_params(layer_chars, filters, kernel_size, strides, dilation_
     if layer_chars_str.count('p') + layer_chars_str.count('n') > 1:
         raise ValueError('One merge layer (p or n) at most may be passed')
 
-    #just dont merge
-    #if (layer_chars_str.count('p') + layer_chars_str.count('n') == 1) and skip_tensor is None:
-        #raise ValueError('Merge layer requested, but no skip_tensor provided')
+    # just dont merge
+    # if (layer_chars_str.count('p') + layer_chars_str.count('n') == 1) and skip_tensor is None:
+    # raise ValueError('Merge layer requested, but no skip_tensor provided')
 
     valid_chars = [char for char in layer_chars_str if char in 'cutdampnbs']
     if len(valid_chars) != len(layer_chars_str):
@@ -75,11 +75,19 @@ def resolve_generic_params(layer_chars, filters, kernel_size, strides, dilation_
     else:
         activation = [activation] * len(layer_chars_list)
 
+    if isinstance(kernel_regularizer, list):
+        if len(kernel_regularizer) == 1:
+            kernel_regularizer = kernel_regularizer * len(layer_chars_list)
+        if len(kernel_regularizer) != len(layer_chars_list):
+            raise ValueError('Number of blocks not equal to number of activations')
+    else:
+        kernel_regularizer = [kernel_regularizer] * len(layer_chars_list)
+
     for s, dr in zip(strides, dilation_rate):
         if s > 1 and dr > 1:
             raise ValueError('Dilation rate > 1 requires strides = 1')
 
-    return layer_chars_list, filters, kernel_size, strides, dilation_rate, dropout, activation
+    return layer_chars_list, filters, kernel_size, strides, dilation_rate, dropout, activation, kernel_regularizer
 
 
 class GenericBlock:
@@ -112,6 +120,7 @@ class GenericBlock:
                  dropout=0.0,
                  activation='relu',
                  blocks=1,
+                 kernel_regularizer=None
                  ):
         self.layer_chars = layer_chars
         self.filters = filters
@@ -121,9 +130,10 @@ class GenericBlock:
         self.dropout = dropout
         self.activation = activation
         self.blocks = blocks
+        self.kernel_regularizer = kernel_regularizer
 
     def __call__(self, input_tensor, level=0, skip_tensor=None, direction='down'):
-        #direction = down mid up
+        # direction = down mid up
         # direction not used for generic block
         (layer_chars_list,
          n_filters_list,
@@ -131,22 +141,25 @@ class GenericBlock:
          strides_list,
          dilation_rate_list,
          dropout_list,
-         activation_list) = resolve_generic_params(self.layer_chars,
-                                                   self.filters,
-                                                   self.kernel_size,
-                                                   self.strides,
-                                                   self.dilation_rate,
-                                                   self.dropout,
-                                                   self.activation)
+         activation_list,
+         kernel_regularizer_list) = resolve_generic_params(self.layer_chars,
+                                                           self.filters,
+                                                           self.kernel_size,
+                                                           self.strides,
+                                                           self.dilation_rate,
+                                                           self.dropout,
+                                                           self.activation,
+                                                           self.kernel_regularizer)
         x = input_tensor
         for b in range(self.blocks):
-            for chars, f, k, s, dr, d, a in zip(layer_chars_list,
-                                                n_filters_list,
-                                                kernel_size_list,
-                                                strides_list,
-                                                dilation_rate_list,
-                                                dropout_list,
-                                                activation_list):
+            for chars, f, k, s, dr, d, a, kr in zip(layer_chars_list,
+                                                    n_filters_list,
+                                                    kernel_size_list,
+                                                    strides_list,
+                                                    dilation_rate_list,
+                                                    dropout_list,
+                                                    activation_list,
+                                                    kernel_regularizer_list):
                 for char in chars:
                     if char == 'c':
                         x = layers.Conv2D(filters=f * 2 ** level,
@@ -154,6 +167,7 @@ class GenericBlock:
                                           kernel_initializer='he_normal',
                                           strides=s,
                                           dilation_rate=dr,
+                                          kernel_regularizer=kr,
                                           padding='same')(x)
                     if char == 'u':
                         x = layers.UpSampling2D(size=(2, 2))(x)  # perhaps use s instead of 2?
@@ -163,6 +177,7 @@ class GenericBlock:
                                                    strides=s,
                                                    dilation_rate=dr,
                                                    kernel_initializer='glorot_uniform',
+                                                   kernel_regularizer=kr,
                                                    padding='same')(x)
                     if char == 'd':
                         if 0.0 < d < 1.0:
@@ -186,6 +201,7 @@ class GenericBlock:
                                                    kernel_initializer='he_normal',
                                                    strides=s,
                                                    dilation_rate=dr,
+                                                   depthwise_regularizer=kr,
                                                    padding='same')(x)
 
         return x
@@ -206,7 +222,7 @@ class GenericUnet:
         self.down_tensors = [None] * (self.height - 1)
         self.output_tensor = None
 
-        if prev_unet_down_tensors is not None and len(prev_unet_down_tensors) != height-1:
+        if prev_unet_down_tensors is not None and len(prev_unet_down_tensors) != height - 1:
             raise ValueError('Invalid prev_unet_down_tensors length')
 
     def __call__(self, input_tensor):
@@ -216,15 +232,15 @@ class GenericUnet:
             if self.prev_unet_down_tensors is not None:
                 x = layers.Add()([x, self.prev_unet_down_tensors[level]])
             self.down_tensors[level] = x * self.concat_multiplier
-            #self.down_tensors[level] = scalar_mul(self.concat_multiplier, x)
+            # self.down_tensors[level] = scalar_mul(self.concat_multiplier, x)
             x = layers.MaxPooling2D((2, 2), strides=2)(x)
 
         x = self.level_block(x, level=level + 1, direction='mid')
 
         for level in range(level, -1, -1):
-            x = layers.Conv2DTranspose(self.level_block.filters * 2 ** level, kernel_size=3, strides=2, padding='same')(x)
+            x = layers.Conv2DTranspose(self.level_block.filters * 2 ** level, kernel_size=3, strides=2, padding='same')(
+                x)
             x = self.level_block(x, level=level, skip_tensor=self.down_tensors[level], direction='up')
 
         self.output_tensor = x
         return x
-

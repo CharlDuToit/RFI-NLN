@@ -17,7 +17,7 @@ def DSC_DUAL_RESUNET(args):
     max_height = np.floor(np.log2(args.input_shape[0])).astype(int) - 1  # why -1?  minimum tensor size 2x2
     height = max_height if args.height is None else np.minimum(args.height, max_height)
 
-    res_block = ResidualBlock(filters=args.filters)
+    res_block = ResidualBlock(filters=args.filters, dropout=args.dropout, kernel_regularizer=args.kernel_regularizer)
     dsc_unet_0 = GenericUnet(height, level_block=res_block)
     x = dsc_unet_0(input_data)
 
@@ -39,8 +39,17 @@ def DSC_DUAL_RESUNET(args):
 class ResidualBlock(GenericBlock):
 
     def __call__(self, input_tensor, level=0, skip_tensor=None, direction='not applicable'):
-        skip0 = GenericBlock('nsb', self.filters)(input_tensor, level=level, skip_tensor=skip_tensor)
-        skip1 = GenericBlock('sbp', self.filters)(skip0, level=level, skip_tensor=skip0)
-        x = GenericBlock('sbp', self.filters)(skip1, level=level, skip_tensor=skip1)
+        skip0 = GenericBlock('nsb',
+                             self.filters,
+                             kernel_regularizer=self.kernel_regularizer,
+                             dropout=self.dropout)(input_tensor, level=level, skip_tensor=skip_tensor)
+        skip1 = GenericBlock('sbpd',
+                             self.filters,
+                             kernel_regularizer=self.kernel_regularizer,
+                             dropout=self.dropout)(skip0, level=level, skip_tensor=skip0)
+        x = GenericBlock('sbpd',
+                         self.filters,
+                         kernel_regularizer=self.kernel_regularizer,
+                         dropout=self.dropout)(skip1, level=level, skip_tensor=skip1)
         return x
 

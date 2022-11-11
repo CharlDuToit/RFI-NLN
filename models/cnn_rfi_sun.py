@@ -50,6 +50,7 @@ def CNN_RFI_SUN(args, dropout=0.0):
     #
     # tf input: (H, W, C) with data_format ='channels_last'
     #
+    # Actual input shape might be (1,1,2)
     input_data = tf.keras.Input((1, 2, 1), name='data')
 
     c1 = CNN_RFI_SUN_block(input_data, 64, conv_kernel_size=(1, 2), pool_size=(1, 1), pool_stride=1)  # 64 3 3
@@ -62,7 +63,8 @@ def CNN_RFI_SUN(args, dropout=0.0):
     f = layers.Flatten()(c4)  # should apparently flatten to 512 nodes
     d1 = layers.Dense(1024, activation='relu')(f)
     do = layers.Dropout(dropout)(d1)
-    outputs = layers.Dense(2, activation='softmax')(do)  # replace with 1 channel and sigmoid?
+    #outputs = layers.Dense(2, activation='softmax')(do)  # replace with 1 channel and sigmoid?
+    outputs = layers.Dense(1, activation='sigmoid')(do)  # replace with 1 channel and sigmoid?
 
     model = tf.keras.Model(inputs=[input_data], outputs=[outputs])
     return model

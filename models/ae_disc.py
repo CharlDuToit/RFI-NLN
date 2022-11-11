@@ -28,13 +28,14 @@ class Encoder(tf.keras.layers.Layer):
         # output shape = 2,2
         self.flatten = layers.Flatten()
         self.dense_ae = layers.Dense(self.latent_dim, activation=None)
+        #self.shape = (None, self.latent_dim)
 
         self.dense_vae = layers.Dense(args.filters, activation='relu')
         self.mean = layers.Dense(self.latent_dim)
         self.logvar = layers.Dense(self.latent_dim)
 
-    def __call__(self, x, vae=False):
-#    def call(self, x, vae=False):
+    #def __call__(self, x, vae=False):
+    def call(self, x, vae=False):
         x = self.input_layer(x)
 
         for layer in range(self.height):
@@ -84,8 +85,8 @@ class Decoder(tf.keras.layers.Layer):
                                                   kernel_size=(3, 3),
                                                   padding='same',
                                                   activation='sigmoid')
-    def __call__(self, x):
-    #def call(self, x):
+    #def __call__(self, x):
+    def call(self, x):
         x = self.input_layer(x)
         x = self.dense(x)
         x = self.reshape(x)
@@ -105,8 +106,8 @@ class Autoencoder(tf.keras.Model):
         super(Autoencoder, self).__init__()
         self.encoder = Encoder(args)
         self.decoder = Decoder(args)
-    def __call__(self, x):
-#    def call(self, x):
+    #def __call__(self, x):
+    def call(self, x):
         z = self.encoder(x, vae=False)
         x_hat = self.decoder(z)
         return x_hat
@@ -119,8 +120,8 @@ class Discriminator(tf.keras.Model):
         self.flatten = layers.Flatten()
         self.dense = layers.Dense(1, activation='sigmoid')
 
-    def __call__(self, x):
-    #def call(self, x):
+    #def __call__(self, x):
+    def call(self, x):
         z = self.network(x)
         classifier = self.flatten(z)  # Is this required? Encoder already flattens? Maybe required for vae
         classifier = self.dense(classifier)

@@ -90,8 +90,6 @@ def train(ae,discriminator, train_dataset,test_images,test_labels,args):
         save_checkpoint(dir_path, ae, 'AE', epoch)
         save_checkpoint(dir_path, discriminator, 'DISC', epoch)
 
-
-
         ae_loss.append(auto_loss)
         d_loss.append(disc_loss)
         g_loss.append(gen_loss)

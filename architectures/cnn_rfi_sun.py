@@ -37,6 +37,7 @@ def train(cnn_rfi_sun, train_dataset, train_images, train_masks, test_images, te
     dir_path = 'outputs/{}/{}/{}'.format(args.model, args.anomaly_class, args.model_name)
 
     # might have to remove reshape
+    # if data is already in shape (None, 1,1,2) then .reshape below can be removed
     train_mask_dataset = tf.data.Dataset.from_tensor_slices(train_masks.astype('float32').reshape((-1,1,1,2)).transpose(0,1,3,2)).shuffle(BUFFER_SIZE,seed=42).batch(BATCH_SIZE)
     train_data_dataset = tf.data.Dataset.from_tensor_slices(train_images.reshape((-1,1,1,2)).transpose(0,1,3,2)).shuffle(BUFFER_SIZE, seed=42).batch(BATCH_SIZE)
     for epoch in range(args.epochs):

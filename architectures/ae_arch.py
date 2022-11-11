@@ -3,7 +3,6 @@ from .generic_architecture import GenericArchitecture
 from utils.metrics import (get_nln_metrics,
                            save_metrics_csv,
                            evaluate_performance,
-                           get_metrics,
                            save_results_csv,
                            nln,
                            get_nln_errors,
@@ -32,8 +31,12 @@ class AEArchitecture(GenericArchitecture):
         super(AEArchitecture, self).__init__(model, args)
         self.loss_func = tf.keras.losses.MeanSquaredError()
         self.optimizer = tf.keras.optimizers.Adam(1e-4)
+        self.lr = 1e-4
+        self.loss = 'mse'
         if isinstance(model, (tuple, list)):
             self.model = model[0]  # Autoencoder
+        if not os.path.exists(self.dir_path + '/inferred'):
+            os.makedirs(self.dir_path + '/inferred')
 
     def train(self, data_collection: DataCollection):
         if not data_collection.all_not_none(['normal_train_data']):
@@ -78,12 +81,28 @@ class AEArchitecture(GenericArchitecture):
                                      nln_error, dists, combined)
 
     # should still do the job of encoder and decoder (autoencoder)
-    # def infer(self, data):
+    def infer(self, data):
+        # assume self.model is not a list type e.g. (ae, disc) and that the model has only one output
+        # i.e. len(model.outputs) == 1
+        # data can be in patches or not
+
+        data_tensor = tf.data.Dataset.from_tensor_slices(data).batch(self.batch_size)
+        output = np.empty(data.shape, dtype=np.float32)
+        #output = np.empty([len(data)] + self.model.outputs[0].shape[1:], dtype=np.float32)
+        strt, fnnsh = 0, 0
+        for batch in data_tensor:
+            fnnsh += len(batch)
+            output[strt:fnnsh, ...] = self.model(batch, training=False).numpy()  # .astype(np.float32)
+            strt = fnnsh
+
+        output[output == np.inf] = np.finfo(output.dtype).max
+        return output
 
     # to access encoder
     def infer_latent_dims(self, data):
         data_tensor = tf.data.Dataset.from_tensor_slices(data).batch(self.batch_size)
-        output = np.empty([len(data)] + self.model.encoder.shape[1:], dtype=np.float32)
+        output = np.empty( (len(data), self.latent_dim), dtype=np.float32)
+        #output = np.empty([len(data)] + self.model.encoder.shape[1:], dtype=np.float32)
         strt, fnnsh = 0, 0
         for batch in data_tensor:
             fnnsh += len(batch)
@@ -176,7 +195,7 @@ class AEArchitecture(GenericArchitecture):
                 combined_recon = dc.combine(nln_error_recon, dists_recon, alpha)
 
                 # Combined metrics
-                combined_auroc, combined_auprc, combined_f1 = get_metrics(test_masks_recon, combined_recon)
+                combined_auroc, combined_auprc, combined_f1 = self.get_metrics(test_masks_recon, combined_recon)
                 combined_dict = {'combined_auroc': combined_auroc,
                                  'combined_auprc': combined_auprc,
                                  'combined_f1': combined_f1}
@@ -204,7 +223,7 @@ class AEArchitecture(GenericArchitecture):
                                                   combined_recon[inds])
 
         # Save solution info
-        self.save_summary()
+        #self.save_summary()
         self.save_solution_config({**arch_dict, **data_dict, 'alphas': self.alphas, 'neighbours': self.neighbours})
 
     # def load_checkpoint(self):

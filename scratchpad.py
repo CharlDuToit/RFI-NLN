@@ -5,11 +5,13 @@ from utils.profiling import *
 from utils.hardcoded_args import *
 from data import *
 from utils.data.patches import get_patches, reconstruct
+from utils.plotting import save_flops_metric
+from utils.metrics import load_csv, extract_results, ResultsCollection
 
 #from models import (Autoencoder,
                    #Discriminator_x)
 
-from architectures.generic_architecture import end_routine
+#from architectures.generic_architecture import end_routine
 
 class Args:
     input_shape = (32, 32, 1)
@@ -177,10 +179,25 @@ def test_patches():
     #print(recon.shape == data.shape)
     #print(np.allclose(recon, data))
 
+def test_flop_f1_plot():
+    group_filter_dict = {'model': 'UNET'}
+    rc = ResultsCollection('LOFAR', group_filter_dict={}, dir_path='./outputs/LOFAR-hyp-search')
+    rc.load_groups()
+    rc.save_flops_f1()
+    #for label, test_f1 in zip(rc.labels, rc.test_f1_means):
+        #print(label)
+        #print(label, test_f1)
+
+def test_training_curve_plot():
+    rc = ResultsCollection('HERA', group_filter_dict={}, dir_path='./outputs/2022-11-02-hyp-search')
+    rc.save_training_metrics('AC_UNET', 'bce', )
+
+
+
 if __name__ == '__main__':
   #  load_model()
     #save_all_summaries()
-    test_patches_arb()
+    test_flop_f1_plot()
     #save_summ()
     #save_dsc_dual_resunet()
     #freeze_and_flops()

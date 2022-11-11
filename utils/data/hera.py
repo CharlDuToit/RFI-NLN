@@ -2,9 +2,10 @@ import numpy as np
 #from sklearn.model_selection import train_test_split
 
 
-rfi_models = ['rfi_stations', 'rfi_dtv', 'rfi_impulse', 'rfi_scatter']
 
 def get_hera_data(args):
+    rfi_models = ['rfi_stations', 'rfi_dtv', 'rfi_impulse', 'rfi_scatter']
+
     if args.rfi is not None:
         (_,_,test_data, 
          test_masks)  =  np.load('{}/HERA_04-03-2022_{}.pkl'.format(args.data_path,

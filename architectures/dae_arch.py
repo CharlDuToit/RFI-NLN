@@ -112,7 +112,7 @@ class DAEArchitecture(AEArchitecture):
         self.save_training_metrics_image([auto_epoch_losses, disc_epoch_losses, gen_epoch_losses],
                                          ['AE loss', 'DISC loss', 'GEN loss'])
 
-    def save_checkpoint(self, epoch, model_subtype=None):
+    def save_checkpoint(self, epoch=-1, model_subtype=None, losses=None):
         if model_subtype == 'AE':
             save_checkpoint(self.dir_path, self.model, model_subtype, epoch)
         if model_subtype == 'DISC':

@@ -112,7 +112,10 @@ def UNET(args):
     max_height = np.floor(np.log2(args.input_shape[0])).astype(int) - 1  # why -1?  minimum tensor size 2x2
     height = max_height if args.height is None else np.minimum(args.height, max_height)
 
-    level_block = GenericBlock('ncba', args.filters, blocks=args.level_blocks)
+    level_block = GenericBlock('ncbad', args.filters,
+                               blocks=args.level_blocks,
+                               dropout=args.dropout,
+                               kernel_regularizer=args.kernel_regularizer)
     x = GenericUnet(height, level_block=level_block)(input_data)
 
     x = GenericBlock('ca', 1, kernel_size=1, strides=1, activation='sigmoid')(x)

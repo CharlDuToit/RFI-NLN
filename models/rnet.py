@@ -61,8 +61,18 @@ def RNET(args):
     """
     input_data = tf.keras.Input(args.input_shape, name='data')
     xp = layers.Conv2D(filters=args.filters, kernel_size=5, strides=(1, 1), padding='same')(input_data)
-    x3 = GenericBlock('ba cba cba p', args.filters, kernel_size=5, strides=1)(xp, skip_tensor=xp)
-    x7 = GenericBlock('cba cba p', args.filters, kernel_size=5, strides=1)(x3, skip_tensor=x3)
+    x3 = GenericBlock('ba cba cbad p',
+                      args.filters,
+                      kernel_size=5,
+                      strides=1,
+                      dropout=args.dropout,
+                      kernel_regularizer=args.kernel_regularizer)(xp, skip_tensor=xp)
+    x7 = GenericBlock('cba cbad p',
+                      args.filters,
+                      kernel_size=5,
+                      strides=1,
+                      dropout=args.dropout,
+                      kernel_regularizer=args.kernel_regularizer)(x3, skip_tensor=x3)
     # Mesarcic had kernel_size 5, Charl changed it back to 1
     # Mesarcic had relu as final activation, charl changed to sigmoid.
     # Paper 14 never mentions any activation function excpet RELU,
@@ -71,7 +81,12 @@ def RNET(args):
     #we find that inserting batch normalization layer and using
     #RELU activation functions to be optimal"
 
-    x = GenericBlock('cba', args.filters, kernel_size=5, strides=1, activation='relu')(x7)
+    x = GenericBlock('cba',
+                     args.filters,
+                     kernel_size=5,
+                     strides=1,
+                     activation='relu',
+                     kernel_regularizer=args.kernel_regularizer)(x7)
     x = GenericBlock('ca', 1, kernel_size=1, strides=1, activation='sigmoid')(x)
 
     model = tf.keras.Model(inputs=[input_data], outputs=[x])

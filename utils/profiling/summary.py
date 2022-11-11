@@ -20,14 +20,30 @@ def save_summary(model, args):
 def save_summary_to_folder(model, folder, args):
     if folder[-1] == '/':
         folder = folder[0:-1]
-    summ_path = f'{folder}/{args.model}_{args.model_config}_height_{args.height}_filters_{args.filters}_blocks_{args.level_blocks}'
+
+    if args.patches:
+        summ_path = f'{folder}/{args.model}_{args.model_config}_height_{args.height}_filters_{args.filters}_blocks_{args.level_blocks}_patch_{args.patch_x}'
+    else:
+        summ_path = f'{folder}/{args.model}_{args.model_config}_height_{args.height}_filters_{args.filters}_blocks_{args.level_blocks}'
 
     if not os.path.exists(folder):
         os.makedirs(folder)
 
     with open(summ_path, 'w') as f:
         model.summary(print_fn=lambda x: f.write(x + '\n'))
-        f.write(f'GFLOPS: {get_flops(model)/1e9}')
+        #f.flush()
+        #f.close()
+
+    flops = get_flops(model)
+    flops_image = flops * (args.raw_input_shape[0] // args.patch_x) * (args.raw_input_shape[1] // args.patch_y)
+    #with open(summ_path + '_flops', 'a+') as f:
+    with open(summ_path, 'a+') as f:
+        f.write(f'GFLOPS patch: {flops / 1e9}\n')
+        f.write(f'GFLOPS image: {flops_image / 1e9}')
+    #with open(summ_path + '_flops', 'w') as f:
+    #    f.write(f'GFLOPS patch: {flops / 1e9}\n')
+    #    f.write(f'GFLOPS image: {flops_image / 1e9}')
+
 
 
 def num_trainable_params(model):

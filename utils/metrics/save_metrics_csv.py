@@ -143,7 +143,7 @@ def save_results_csv(data_name, seed, results_dict):
     none_dict = empty_dict()
     save_dict = {**none_dict, **results_dict}
     for k in save_dict.keys():
-        save_dict[k] = str(save_dict[k] )
+        save_dict[k] = str(save_dict[k])
     #index = [i for i in range(len(save_dict))]
     save_df = pd.DataFrame([save_dict])
     dir_path = 'outputs/results_{}_{}.csv'.format(data_name, seed)
@@ -167,16 +167,28 @@ def empty_dict():
         'rfi_threshold': None,
         'ood_rfi': None,
         'lofar_subset': None,
-        'num_training': None,
+        'limit': None,
+        'num_train': None,
+        'num_val': None,
+        'use_hyp_data': None,
+        'epochs': None,
+        'batch_size': None,
+        'dropout': None,
+        'kernel_regularizer': None,
 
         'raw_input_shape': None,
+        'input_shape': None,
         'num_patches': None,
         'patch_x': None,
         'patch_y': None,
+
+        'lr': None,
+        'loss': None,
+
         'std_plus': None,
         'std_minus': None,
         'per_image': None,
-        'combine_min_std_plus' : None,
+        'combine_min_std_plus': None,
 
         'latent_dim': None,
         'alpha': None,
@@ -187,18 +199,31 @@ def empty_dict():
         'filters': None,
         'height': None,
         'level_blocks': None,
+        'dilation_rate': None,
 
         'trainable_params': None,
         'nontrainable_params': None,
 
-        'flops_patch': None,
-        'time_patch': None,
-        'flops_image': None,
-        'time_image': None,
+        'last_epoch': None,
+        'epoch_time': None,
 
-        'auroc': None,
-        'auprc': None,
-        'f1': None,
+        'time_image': None,
+        'time_patch': None,
+
+        'flops_image': None,
+        'flops_patch': None,
+
+        'train_loss': None,
+        'val_loss': None,
+        #'opt_thresh':  None,
+
+        'val_auroc': None,
+        'val_auprc': None,
+        'val_f1': None,
+
+        'test_auroc': None,
+        'test_auprc': None,
+        'test_f1': None,
 
         'ae_auroc': None,
         'ae_auprc': None,

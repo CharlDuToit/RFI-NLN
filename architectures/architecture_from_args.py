@@ -9,7 +9,7 @@ import tensorflow as tf
 
 
 def get_architecture_from_args(args):
-    args = resolve_model_config_args(args)
+    #args = resolve_model_config_args(args)
     model = get_model_from_args(args)  # Tuple for DAE
 
     # Select the Architecture instance, optimizer and loss

@@ -10,10 +10,14 @@ ld=8
 patch=32
 threshold=10
 
+# -data_path /home/ee487519/DatasetsAndConfig/Given/43_Mesarcik_2022/ \
+# -data_path ./data \
+
+# Always same seed in for repeat in 1 2 3
 #for model in UNET DAE RNET RFI_NET
 for model in UNET
 do
-		for repeat in 1 
+		for repeat in 1 2 3
 		do
 				python3 -u main.py -model $model\
 								  -limit $limit\
@@ -33,6 +37,7 @@ do
 								  -patch_stride_y $patch \
 								  -neighbours 20\
 								  -algorithm knn\
-								  -seed $d$seed | tee -a hera.log 
+								  -seed $d$seed | tee -a hera.log
+
 		done
 done										  

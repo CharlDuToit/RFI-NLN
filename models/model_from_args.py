@@ -13,7 +13,7 @@ from utils.hardcoded_args import resolve_model_config_args
 
 
 def get_model_from_args(args):
-    args = resolve_model_config_args(args)
+    #args = resolve_model_config_args(args)
     if args.model == 'UNET':
         return UNET(args)
     if args.model == 'AC_UNET':

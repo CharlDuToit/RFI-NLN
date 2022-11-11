@@ -152,7 +152,7 @@ def RFI_NET(args):
     #x = GenericBlock('cba cba', args.filters, kernel_size=3, strides=1)(input_data) # look at table 1
     x = input_data
 
-    level_block = RFINETBlock(filters=args.filters, dropout=args.dropout)  # note *2
+    level_block = RFINETBlock(filters=args.filters, dropout=args.dropout, kernel_regularizer=args.kernel_regularizer)  # note *2
     x = GenericUnet(height, level_block=level_block)(x)
 
     # removed batchnorm from table 1, i.e. no longer cba
@@ -167,12 +167,11 @@ class RFINETBlock(GenericBlock):
     def __call__(self, input_tensor, level=0, skip_tensor=None, direction='down'):
         filters = self.filters
         if direction == 'up':
-            #n = GenericBlock('ban')(input_tensor, skip_tensor=skip_tensor)
             n = GenericBlock('n')(input_tensor, skip_tensor=skip_tensor)
-        #elif (direction == 'down' and level > 0) or direction == 'mid':
-            #n = GenericBlock('d', dropout=self.dropout)(input_tensor)  # dropout
         else:
             n = input_tensor
-        x = GenericBlock('cba cba cb', filters)(n, level=level)
-        x = GenericBlock('cb p ba', filters)(n, level=level, skip_tensor=x)  # check filters
+        x = GenericBlock('cba cba cb', filters, kernel_regularizer=self.kernel_regularizer)(n, level=level)
+        x = GenericBlock('cb p bad', filters,
+                         dropout=self.dropout,
+                         kernel_regularizer=self.kernel_regularizer)(n, level=level, skip_tensor=x)
         return x

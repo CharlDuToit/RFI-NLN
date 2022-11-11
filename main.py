@@ -1,84 +1,49 @@
-import numpy as np 
-import tensorflow as tf
+# import numpy as np
+# import tensorflow as tf
 from data import *
-from utils import args 
-from architectures import *
+from utils import args
+# from architectures import *
 from utils.hardcoded_args import *
-#from utils.data import DataCollection
+# from utils.data import DataCollection
 from data_collection import get_data_collection_from_args
 from architectures import get_architecture_from_args
+
+import time
+
+
+# import os
+# os.environ['TF_GPU_ALLOCATOR'] = 'cuda_malloc_async'
 
 def main():
     """
         Reads data and cmd arguments and trains models
     """
-    # Add out_channels as arg?
+    # print(args.args)
+    # return
 
-    new_way = True
-    if new_way:
-        data_collection = get_data_collection_from_args(args.args)
-        arch = get_architecture_from_args(args.args)
-        print("__________________________________ \n Save name {}".format(args.args.model_name))
-        print("__________________________________ ")
-        arch.train(data_collection)
-        print("__________________________________ \n Evaluating data")
-        arch.evaluate_and_save(data_collection)
-    else:
-        if args.args.data == 'HERA':
-            #data_collection = DataCollection(args.args, std_plus=4, std_minus=1, flag_test_data=True, generate_ae_data=True)
-            #data_collection.load()
-            data = load_hera(args.args)
-        elif args.args.data == 'LOFAR':
-           # data_collection = DataCollection(args.args, std_plus=95, std_minus=3, flag_test_data=False, generate_ae_data=True)
-            #data_collection.load()
-            data = load_lofar(args.args)
-        # elif args.args.data == 'HERA_PHASE':
-        #    data = load_hera_phase(args.args)
-        # elif args.args.data == 'HIDE':
-        #    data = load_hide(args.args)
-
-        (unet_train_dataset, train_data, train_labels, train_masks,
-         ae_train_dataset, ae_train_data, ae_train_labels,
-         test_data, test_labels, test_masks,test_masks_orig) = data
-
-        # print(f"train_data: {np.allclose(train_data, data_collection.train_data)}")
-        # print(f"train_masks: {np.allclose(train_masks, data_collection.train_masks)}")
-        # print(f"train_labels: {train_labels == data_collection.train_labels}")
-        # print(f"test_data: {np.allclose(test_data, data_collection.test_data)}")
-        # print(f"test_masks: {np.allclose(test_masks, data_collection.test_masks)}")
-        # print(f"test_labels: {test_labels == data_collection.test_labels}")
-        # print(f"test_masks_orig: {np.allclose(test_masks_orig, data_collection.test_masks_orig)}")
-        # print(f"ae_train_data: {np.allclose(ae_train_data, data_collection.ae_train_data)}")
-        # print(f"ae_train_labels: {ae_train_labels == data_collection.ae_train_labels}")
-        # return
-
-        print(" __________________________________ \n Save name {}".format(
-                                                   args.args.model_name))
-        print(" __________________________________ \n")
-
-        if args.args.model == 'UNET':
-            train_unet(unet_train_dataset, train_data, train_labels, train_masks, test_data, test_labels, test_masks, test_masks_orig, args.args)
-
-        if args.args.model == 'RNET':
-            train_rnet(unet_train_dataset, train_data, train_labels, train_masks, test_data, test_labels, test_masks, test_masks_orig, args.args)
-
-        if args.args.model == 'RFI_NET':
-            train_rfi_net(unet_train_dataset, train_data, train_labels, train_masks, test_data, test_labels, test_masks, test_masks_orig, args.args)
-
-        if args.args.model == 'CNN_RFI_SUN':
-            train_cnn_rfi_sun(unet_train_dataset, train_data, train_labels, train_masks, test_data, test_labels, test_masks, test_masks_orig, args.args)
-
-        elif args.args.model == 'DKNN':
-            train_resnet(ae_train_dataset, ae_train_data, ae_train_labels, test_data, test_labels, test_masks, test_masks_orig, args.args)
-
-        elif args.args.model == 'AE':
-            train_ae(ae_train_dataset, ae_train_data, ae_train_labels, test_data, test_labels, test_masks, test_masks_orig, args.args)
-
-        elif args.args.model == 'AE-SSIM':
-            train_ae_ssim(ae_train_dataset, ae_train_data, ae_train_labels, test_data, test_labels, test_masks, test_masks_orig, args.args)
-
-        elif args.args.model == 'DAE':
-            train_dae(ae_train_dataset, ae_train_data, ae_train_labels, test_data, test_labels, test_masks, test_masks_orig,args.args)
+    start = time.time()
+    print('===============================================')
+    print('Running with args:\n   model: {}, data: {}, model_config: {}, use_hyp_data: {}, loss: {}, lr: {},'
+          ' dropout: {}, kernel_regularizer: {}, input_channels: {}'.format(
+          args.args.model, args.args.data, args.args.model_config, args.args.use_hyp_data, args.args.loss, args.args.lr,
+          args.args.dropout, args.args.kernel_regularizer, args.args.input_channels))
+    print("__________________________________ \nFetching and preprocessing data: {}".format(args.args.data))
+    data_collection = get_data_collection_from_args(args.args)
+    data_collection.load_raw_data()
+    data_collection.preprocess()
+    # Final shapes are determined after loading data_collection
+    args.args.raw_input_shape = data_collection.raw_input_shape
+    args.args.input_shape = data_collection.input_shape
+    print('Data time : {:.2f} sec'.format(time.time() - start))
+    print("__________________________________ \nModel: {}, Name: {}".format(args.args.model, args.args.model_name))
+    arch = get_architecture_from_args(args.args)
+    arch.train(data_collection)
+    print("__________________________________ \nEvaluating data")
+    eval_start = time.time()
+    arch.evaluate_and_save(data_collection)
+    print('Data Evaluation time : {:.2f} sec'.format(time.time() - eval_start))
+    print('Total time : {:.2f} min'.format((time.time() - start) / 60))
+    print('===============================================')
 
 
 def tiny_args(args_):
@@ -86,17 +51,26 @@ def tiny_args(args_):
     args_.model_config = 'tiny'
     args_.optimal_alpha = True
     args_.optimal_neighbours = True
-    args_.model = 'ASPP_UNET'
+    args_.model = 'UNET'
     args_ = resolve_model_config_args(args_)
     args_.epochs = 2
-    args_.limit = 8 # full size images
+    args_.limit = 112  # full size images
+    # args_.limit = None  # full size images
     args_.rfi_threshold = None
-    args_.seed = 'bleh'
+    args_.seed = 'test'
+    args_.loss = 'bce'
+    args_.kernel_regularizer = 'l2'
+    args_.dropout = 0.05
+    # args_.use_hyp_data = True
+    args_.use_hyp_data = True
+    args_.data_path = '/home/ee487519/DatasetsAndConfig/Generated/HERA_Charl/'
+    # args_.data_path = '/home/ee487519/DatasetsAndConfig/Given/43_Mesarcik_2022/'
+    args_.data = 'HERA_PHASE'
+    args_.input_channels = 1
     return args_
 
 
 if __name__ == '__main__':
     args.args = tiny_args(args.args)
+    # print(args.args)
     main()
-
-

@@ -3,7 +3,6 @@ from .generic_architecture import GenericArchitecture
 from utils.metrics import (get_nln_metrics,
                            save_metrics_csv,
                            evaluate_performance,
-                           get_metrics,
                            save_results_csv,
                            nln,
                            get_nln_errors,
