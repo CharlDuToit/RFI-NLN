@@ -118,7 +118,7 @@ def all_true(row: pd.core.series.Series, grouped_df, filter_dict ):
 
 
 def get_label(row: pd.core.series.Series, grouped_df, model, filters, height, patch, batch_size, lr, loss, dropout, kernel_regularizer,
-              level_blocks, dilation_rate):
+              level_blocks, dilation_rate, params):
     """If two different rows yields the same label, then not enough params are True"""
     label = ''
     if grouped_df:
@@ -145,6 +145,8 @@ def get_label(row: pd.core.series.Series, grouped_df, model, filters, height, pa
         if dilation_rate:
             if row['model'][0] in ('AC_UNET', 'ASPP_UNET'):
                 label += 'dr-{} '.format(row['dilation_rate'][0])
+        if params:
+            label += 'pa-{} '.format(round(row['trainable_params'][0]/1e6),2)
     else:
         if model:
             label += '{} '.format(row['model'])
@@ -169,6 +171,8 @@ def get_label(row: pd.core.series.Series, grouped_df, model, filters, height, pa
         if dilation_rate:
             if row['model'] in ('AC_UNET', 'ASPP_UNET'):
                 label += 'dr-{} '.format(row['dilation_rate'])
+        if params:
+            label += 'pa-{} '.format(round(row['trainable_params']/1e6),2)
     return label
 
 
@@ -186,5 +190,6 @@ def empty_label_dict():
         'kernel_regularizer': False,
         'level_blocks': False,
         'dilation_rate': False,
+        'params': False,
     }
 

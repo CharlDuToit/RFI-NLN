@@ -19,9 +19,11 @@ def process(data,per_image=True):
     if per_image:
         output = output.astype('float32')
         for i,image in enumerate(data):
-            x,y,z = image.shape
-            output[i,...] = MinMaxScaler(feature_range=(0,1)
-                                          ).fit_transform(image.reshape([x*y,z])).reshape([x,y,z])
+            # x,y,z = image.shape
+            # output[i,...] = MinMaxScaler(feature_range=(0,1)
+            #                               ).fit_transform(image.reshape([x*y,z])).reshape([x,y,z])
+            mi, ma = np.min(image), np.max(image)
+            output[i,...] = (image - mi)/(ma -mi)
     else:
         mi, ma = np.min(data), np.max(data)
         output = (data - mi)/(ma -mi)

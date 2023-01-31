@@ -6,7 +6,7 @@ import time
 from models import Autoencoder
 
 from utils.plotting  import  (generate_and_save_images,
-                              save_training_metrics)
+                              save_epochs_curve)
 
 from utils.training import print_epoch,save_checkpoint
 from model_config import *
@@ -54,7 +54,7 @@ def train(ae,train_dataset,train_images, test_images,test_labels,args,verbose=Tr
         print_epoch('AE', epoch, time.time() - start, auto_loss.numpy(), 'loss')
 
     save_checkpoint(dir_path, ae, 'AE')
-    save_training_metrics(dir_path, ae_loss, 'AE loss')
+    save_epochs_curve(dir_path, ae_loss, 'AE loss')
     generate_and_save_images(ae,epoch,image_batch[:25,...],'AE',args)
 
     return ae

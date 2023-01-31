@@ -8,6 +8,7 @@ import numpy as np
 import os
 import errno
 import pickle
+from scipy.io import loadmat
 
 import tensorflow as tf
 
@@ -21,10 +22,9 @@ class DataCollection:
                  combine_min_std_plus=None,
                  flag_test_data=False,
                  generate_normal_data=False,
-                 per_image=False,
-                 clip=True,
+                 clip_per_image=True,
+                 scale_per_image=True,
                  log=True,
-                 scale=True,
                  hyp_split=0.2):
 
         self.generate_normal_data = generate_normal_data
@@ -34,12 +34,12 @@ class DataCollection:
         self.std_minus = std_minus
         self.std_plus = std_plus
         if std_minus == 0.0 and std_plus == 0.0:
-            self.clip = False
+            self.clip_per_image = False
         else:
-            self.clip = clip
+            self.clip_per_image = clip_per_image
         self.log = log
-        self.scale = scale
-        self.per_image = per_image
+        self.clip_per_image = clip_per_image
+        self.scale_per_image = scale_per_image
 
         self.input_channels = args.input_channels
         self.rfi_threshold = args.rfi_threshold
@@ -90,6 +90,34 @@ class DataCollection:
         # self.test_masks_orig = None  # not generated via aoflagger
 
     def load_raw_data(self):
+        """populates raw train data and masks and raw test data and masks"""
+
+        # ======================================================
+        if self.data_name in ['ant_fft_000_094_t4032_f4096',
+                         'ant_fft_000_094_t4096_f4096',
+                         'ant_fft_000_094_t8128_f8192',
+                         'ant_fft_000_094_t12160_f16384']:
+            file = os.path.join(self.data_path, f'{self.data_name}.mat')
+            self.raw_train_data = np.expand_dims(loadmat(file)['sbdata'], (0, -1))/1e3
+            #self.raw_train_data = np.expand_dims(loadmat(file)['sbdata'][0:512, 0:512], (0, -1))/1e3
+            #print(self.raw_train_data.shape)
+            self.raw_train_masks = None
+            self.raw_test_data = None
+            self.raw_test_masks = None
+        # ======================================================
+        if self.data_name == 'ASTRON_0':
+            file = os.path.join(self.data_path, 'dyn_spectra_000_094.mat')
+            data = loadmat(file)
+            # ac000, ac094, vis000_094
+            self.raw_train_data = np.empty((3,100,300,1), dtype='float32')
+            self.raw_train_data[0, ...] = np.expand_dims(data['ac000'].astype('float32'),  -1)
+            self.raw_train_data[1, ...] = np.expand_dims(data['ac094'].astype('float32'),  -1)
+            self.raw_train_data[2, ...] = np.abs(np.expand_dims(data['vis000_094'].astype('float32'),  -1))
+            self.raw_train_masks = None
+            self.raw_test_data = None
+            self.raw_test_masks = None
+
+        # ======================================================
         if self.data_name == 'LOFAR':
             full_file = file = 'LOFAR_Full_RFI_dataset.pkl'
             if self.lofar_subset is None or self.lofar_subset == 'full':
@@ -104,10 +132,11 @@ class DataCollection:
                 with open('{}/{}'.format(self.data_path, file), 'rb') as f:
                     (self.raw_train_data, self.raw_train_masks, self.raw_test_data, self.raw_test_masks) = pickle.load(
                         f)
-                    self.raw_input_shape = self.raw_train_data.shape[1:]
+                    #self.raw_input_shape = self.raw_train_data.shape[1:]
             else:
                 raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT),
                                         os.path.join(self.data_path, file))
+        # ======================================================
         if self.data_name in ['HERA', 'HERA_PHASE']:
             if self.data_name == 'HERA':
                 date = '04-03-2022'
@@ -136,7 +165,9 @@ class DataCollection:
             self.raw_test_data = test_data.astype('float32')
             self.raw_train_masks = train_masks
             self.raw_test_masks = test_masks
-            self.raw_input_shape = self.raw_train_data.shape[1:]
+
+        # ======================================================
+        self.raw_input_shape = self.raw_train_data.shape[1:]
 
         # After these blocks: self.raw_input_shape[-1] = self.input_channels
         if self.raw_input_shape[-1] != self.input_channels:
@@ -164,13 +195,16 @@ class DataCollection:
         hyp_data = None
         hyp_masks = None
         hyp_labels = None
+        train_labels = None
+        test_labels = None
         normal_hyp_data = None
         normal_hyp_labels = None
 
         if self.limit is not None:
             train_indx = np.random.permutation(len(train_data))[:self.limit]  # lets keep the seed random
             train_data = train_data[train_indx]
-            train_masks = train_masks[train_indx]
+            if train_masks is not None:
+                train_masks = train_masks[train_indx]
 
         # test_masks_orig = copy.deepcopy(test_masks)
         if self.rfi_threshold is not None:
@@ -180,6 +214,7 @@ class DataCollection:
                 test_masks = flag_data(test_data[..., 0], self.data_name, self.rfi_threshold)
                 test_masks = np.expand_dims(test_masks, axis=-1)
 
+        # hyperparam data
         if 0.0 < self.hyp_split < 1.0:
             n_hyp = int(len(train_data) * self.hyp_split)
             rand_indx = np.random.RandomState(seed=42).permutation(len(train_data))  # always same indx
@@ -190,35 +225,60 @@ class DataCollection:
             train_data = train_data[train_indx]
             train_masks = train_masks[train_indx]
 
-        if self.clip:
-            test_data[..., 0] = self.get_clipped(test_data[..., 0], test_masks[..., 0])
-            train_data[..., 0] = self.get_clipped(train_data[..., 0], train_masks[..., 0])
-            hyp_data[..., 0] = self.get_clipped(hyp_data[..., 0], hyp_masks[..., 0])
+        # clip
+        #if self.clip_per_image is False:
+        if test_data is not None:
+            test_data[..., 0] = self.get_clipped_by_minrfi_maxnonrfi(test_data[..., 0], test_masks[..., 0])
+        if train_data is not None:
+            train_data[..., 0] = self.get_clipped_by_minrfi_maxnonrfi(train_data[..., 0], train_masks[..., 0])
+        if hyp_data is not None:
+            hyp_data[..., 0] = self.get_clipped_by_minrfi_maxnonrfi(hyp_data[..., 0], hyp_masks[..., 0])
 
+
+        # log
         if self.log:
-            test_data[..., 0] = np.log(test_data[..., 0])
-            train_data[..., 0] = np.log(train_data[..., 0])
-            if 0.0 < self.hyp_split < 1.0:
+            if test_data is not None:
+                test_data[..., 0] = np.log(test_data[..., 0])
+            if train_data is not None:
+                train_data[..., 0] = np.log(train_data[..., 0])
+            if hyp_data is not None:
                 hyp_data[..., 0] = np.log(hyp_data[..., 0])
-        if self.scale:
+
+        # scale
+        #if self.scale:
+        if test_data is not None:
             test_data[..., 0] = self.rescale(test_data[..., 0])
+        if train_data is not None:
             train_data[..., 0] = self.rescale(train_data[..., 0])
+        if hyp_data is not None:
             hyp_data[..., 0] = self.rescale(hyp_data[..., 0])
 
+        # patches
         if self.patches:
             train_data = self.get_patches(train_data)
-            train_masks = self.get_patches(train_masks)
-            test_data = self.get_patches(test_data)
-            test_masks = self.get_patches(test_masks)
-            hyp_data = self.get_patches(hyp_data)
-            hyp_masks = self.get_patches(hyp_masks)
+            if train_masks is not None:
+                train_masks = self.get_patches(train_masks)
+            if test_data is not None:
+                test_data = self.get_patches(test_data)
+            if test_masks is not None:
+                test_masks = self.get_patches(test_masks)
+            if hyp_data is not None:
+                hyp_data = self.get_patches(hyp_data)
+            if hyp_masks is not None:
+                hyp_masks = self.get_patches(hyp_masks)
         else:
             self.patch_x = self.raw_input_shape[0]
             self.patch_y = self.raw_input_shape[1]
 
-        train_labels = self.get_labels(train_masks)
-        test_labels = self.get_labels(test_masks)
-        hyp_labels = self.get_labels(hyp_masks)
+        # labels
+        if train_masks is not None:
+            train_labels = self.get_labels(train_masks)
+        if test_masks is not None:
+            test_labels = self.get_labels(test_masks)
+        if hyp_masks is not None:
+            hyp_labels = self.get_labels(hyp_masks)
+
+        # normal data
         if self.generate_normal_data:
             normal_train_data, normal_train_labels = self.get_normal_data(train_data, train_masks)
             self.normal_train_data = normal_train_data
@@ -228,6 +288,7 @@ class DataCollection:
             self.normal_hyp_data = normal_hyp_data
             self.normal_hyp_labels = normal_hyp_labels
 
+        # transfer variables to .self
         self.train_labels = train_labels
         self.test_labels = test_labels
         self.train_data = train_data
@@ -272,7 +333,7 @@ class DataCollection:
     def rescale(self, data):
         if data is None:
             return None
-        return process(data, per_image=self.per_image)
+        return process(data, per_image=self.scale_per_image)
 
     def get_normal_data(self, data, masks):
         if data is None or masks is None:
@@ -289,11 +350,48 @@ class DataCollection:
         labels[np.invert(np.any(masks, axis=(1, 2, 3)))] = 'normal'
         return labels
 
-    def get_clipped(self, data, masks):
+    def get_clipped_by_minrfi_maxnonrfi(self, data, masks):
         if data is None or masks is None:
             return None
-        _max = np.mean(data[np.invert(masks)]) + np.abs(self.std_plus) * np.std(data[np.invert(masks)])
-        _min = np.absolute(np.mean(data[np.invert(masks)]) - np.abs(self.std_minus) * np.std(data[np.invert(masks)]))
+        if self.clip_per_image is False:
+            nonrfi_max = np.max(data[~masks])
+            rfi_min = np.min(data[masks])
+            if nonrfi_max > rfi_min:
+                return np.clip(data, nonrfi_max, rfi_min)
+            else:
+                return np.clip(data, rfi_min, nonrfi_max)
+        else:
+            result = np.empty(data.shape, dtype=data.dtype)
+            for i in range(len(data)):
+                nonrfi_max = np.max(data[i][~masks[i]])
+                rfi_min = np.min(data[i][masks[i]])
+                if nonrfi_max > rfi_min:
+                    result[i] = np.clip(data[i], rfi_min, nonrfi_max)
+                else:
+                    result[i] = np.clip(data[i], nonrfi_max, rfi_min)
+            return result
+
+    def get_clipped(self, data, masks):
+        if data is None:
+            return None
+        if masks is None:
+            return self.get_clipped_data(data)
+        # mean and std of nonrfi
+        #_max = np.mean(data[np.invert(masks)]) + np.abs(self.std_plus) * np.std(data[np.invert(masks)])
+        _max = np.mean(data[np.invert(masks)]) + self.std_plus * np.std(data[np.invert(masks)])
+        #_min = np.absolute(np.mean(data[np.invert(masks)]) - np.abs(self.std_minus) * np.std(data[np.invert(masks)]))
+        _min = np.mean(data[np.invert(masks)]) - np.abs(self.std_minus) * np.std(data[np.invert(masks)])
+        return np.clip(data, _min, _max)
+
+    def get_clipped_data(self, data):
+        if data is None:
+            return None
+        std = np.std(data)
+        mean = np.mean(data)
+        #_max = mean + np.abs(self.std_plus) * std
+        _max = mean + self.std_plus * std
+        #_min = np.absolute(mean - np.abs(self.std_minus) * std)
+        _min = mean - np.abs(self.std_minus) * std
         return np.clip(data, _min, _max)
 
     def flag_data(self, data):
@@ -339,7 +437,7 @@ class DataCollection:
     #    self.load_raw_data()
     #    self.preprocess()
 
-    def get_datasets(self, val_split=0.1, use_hyp_data=False, use_normal_data=False, buffer_size=2**14, batch_size=32, seed=None):
+    def get_datasets(self, val_split=0.2, use_hyp_data=False, use_normal_data=False, buffer_size=2**10, batch_size=64, seed=None):
         if seed is None:
             seed = np.random.randint(0, 2**16)
         if not use_hyp_data:
@@ -385,7 +483,7 @@ class DataCollection:
         num_train = len(train_indx)
         num_val = len(val_indx)
 
-        return train_data_dataset, val_data_dataset, train_mask_dataset, val_mask_dataset, num_train, num_val
+        return train_data_dataset, val_data_dataset, train_mask_dataset, val_mask_dataset, num_train, num_val, seed
 
     def all_not_none(self, properties):
         for prop in properties:
@@ -435,7 +533,8 @@ class DataCollection:
             'limit': self.limit,
             'std_plus': self.std_plus,
             'std_minus': self.std_minus,
-            'per_image': self.per_image,
+            'scale_per_image': self.scale_per_image,
+            'clip_per_image': self.clip_per_image,
             'patch_x': self.patch_x,
             'patch_y': self.patch_y,
             'anomaly_class': self.anomaly_class,

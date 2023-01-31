@@ -19,7 +19,7 @@ def swap_index(df,i0,i1):
 #df = pd.read_csv('outputs/results_HERA_05-01-2022-01-57_860ccb.csv').iloc[:60]
 # Out of distribution OOD
 df = pd.read_csv('outputs/results_HERA_OOD_Final.csv')
-df = df.groupby(['Model','Patch_Size','Neighbour','OOD_RFI'],as_index=False).agg({'AUROC_TRUE':['mean','std'],
+df = df.groupby_and_agg(['Model', 'Patch_Size', 'Neighbour', 'OOD_RFI'], as_index=False).agg({'AUROC_TRUE':['mean', 'std'],
                                                                                   'AUPRC_TRUE':['mean','std'],
                                                                                   'F1_TRUE':['mean','std'],
                                                                                   'NLN_AUROC_TRUE':['mean','std'],
@@ -95,7 +95,7 @@ plt.savefig('/tmp/OOD',dpi=300)
 #######
 
 df = pd.read_csv('outputs/results_HERA_Thresholds_Final.csv')
-df = df.groupby(['Model','Patch_Size','Neighbour','RFI_Threshold'],as_index=False).agg({'AUROC_TRUE':['mean','std'],
+df = df.groupby_and_agg(['Model', 'Patch_Size', 'Neighbour', 'RFI_Threshold'], as_index=False).agg({'AUROC_TRUE':['mean', 'std'],
                                                                                   'AUPRC_TRUE':['mean','std'],
                                                                                   'F1_TRUE':['mean','std'],
                                                                                   'NLN_AUROC_TRUE':['mean','std'],

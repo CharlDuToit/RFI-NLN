@@ -6,7 +6,7 @@ import time
 from models import CNN_RFI_SUN
 
 from utils.plotting import (generate_and_save_images,
-                            save_training_metrics)
+                            save_epochs_curve)
 
 from utils.training import print_epoch, save_checkpoint
 from model_config import *
@@ -66,7 +66,7 @@ def train(cnn_rfi_sun, train_dataset, train_images, train_masks, test_images, te
     #                           'CNN_RFI_SUN', args)
     save_checkpoint(dir_path, cnn_rfi_sun, 'CNN_RFI_SUN')
 
-    save_training_metrics(dir_path, cnn_rfi_sun_loss, 'CNN_RFI_SUN loss')
+    save_epochs_curve(dir_path, cnn_rfi_sun_loss, 'CNN_RFI_SUN loss')
 
     #generate_and_save_images(cnn_rfi_sun, epoch, image_batch[:25, ...], 'CNN_RFI_SUN', args)
 

@@ -7,53 +7,63 @@ import numpy as np
 import pandas as pd
 
 
-def save_training_metrics(dir_path, metrics, metric_labels, file_name='training_metrics', ylabel='Loss'):
-    """
-        Shows line plot of the training curves
 
-        dir_path  (str): path to save image
-        metrics (list of lists): list of metrics
-        metric_labels (list): name of each metrics
-
-    """
-    if not isinstance(metrics[0], list):
-        metrics = [metrics]
-    if not isinstance(metric_labels, list):
-        metric_labels = [metric_labels]
-    for epochs_metric, label in zip(metrics, metric_labels):
-        if len(epochs_metric) == 0:
-            metrics.remove(epochs_metric)
-            metric_labels.remove(label)
-
-    #epochs = [e for e in range(len(metrics[0]))]
-    fig = plt.figure(figsize=(10,10))
-    for metric, label in zip(metrics, metric_labels):
-        epochs = [e for e in range(len(metric))]
-        plt.plot(epochs, metric, label=label)
-    plt.legend()
-    plt.xlabel('Epochs')
-    plt.ylabel(ylabel)
-    #plt.tight_layout()
-    plt.savefig('{}/{}.png'.format(dir_path, file_name))
-    plt.close('all')
-
-
-def save_data_masks_inferred(dir_path, data, masks, masks_inferred, epoch=-1, thresh=-1):
+def save_data_inferred(dir_path, data, masks_inferred, thresh=-1, figsize=(10,20)):
     # masks_inferred = self.infer(data)
-    fig, ax = plt.subplots(len(data), 4, figsize=(10, 20))
+    fig, ax = plt.subplots(len(data), 2, figsize=figsize)
+    if len(data) == 1:
+        ax[0].title.set_text('Input')
+        ax[1].title.set_text('Mask Inferred')
+        ax[0].imshow(data[0, ..., 0])
+        ax[1].imshow(masks_inferred[0, ..., 0])
+    else:
+        ax[0, 0].title.set_text('Input')
+        ax[0, 1].title.set_text('Mask Inferred')
+        for i in range(len(data)):
+            ax[i, 0].imshow(data[i, ..., 0])
+            ax[i, 1].imshow(masks_inferred[i, ..., 0])
 
-    ax[0, 0].title.set_text('Input')
-    ax[0, 1].title.set_text('Mask')
-    ax[0, 2].title.set_text('Mask Inferred')
-    ax[0, 3].title.set_text('Absolute Error')
-
-    for i in range(len(data)):
-        ax[i, 0].imshow(data[i, ..., 0])
-        ax[i, 1].imshow(masks[i, ..., 0])
-        ax[i, 2].imshow(masks_inferred[i, ..., 0])
-        ax[i, 3].imshow(np.absolute(masks[i, ..., 0] - masks_inferred[i, ..., 0]))
+    #fig, ax = plt.subplots(np.maximum(len(data), 2), 2, figsize=figsize)
 
     plt.tight_layout()
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+    if 0.0 < thresh < 1.0:
+        fig.savefig('{}/data_masks_image_thresh_{:.2f}.png'.format(dir_path, thresh))
+    else:
+        fig.savefig('{}/data_masks_image.png'.format(dir_path))
+
+    plt.close('all')
+
+def save_data_masks_inferred(dir_path, data, masks, masks_inferred, epoch=-1, thresh=-1, figsize=(10, 20)):
+    # masks_inferred = self.infer(data)
+    fig, ax = plt.subplots(len(data), 4, figsize=figsize)
+
+    if len(data) == 1:
+        ax[0].title.set_text('Input')
+        ax[1].title.set_text('Mask')
+        ax[2].title.set_text('Mask Inferred')
+        ax[3].title.set_text('Absolute Error')
+        ax[0].imshow(data[0, ..., 0])
+        ax[1].imshow(masks[0, ..., 0])
+        ax[2].imshow(masks_inferred[0, ..., 0])
+        ax[3].imshow(np.absolute(masks[0, ..., 0] - masks_inferred[0, ..., 0]))
+
+    else:
+        ax[0, 0].title.set_text('Input')
+        ax[0, 1].title.set_text('Mask')
+        ax[0, 2].title.set_text('Mask Inferred')
+        ax[0, 3].title.set_text('Absolute Error')
+
+        for i in range(len(data)):
+            ax[i, 0].imshow(data[i, ..., 0])
+            ax[i, 1].imshow(masks[i, ..., 0])
+            ax[i, 2].imshow(masks_inferred[i, ..., 0])
+            ax[i, 3].imshow(np.absolute(masks[i, ..., 0] - masks_inferred[i, ..., 0]))
+
+    plt.tight_layout()
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
     if epoch > -1:
         fig.savefig('{}/epochs/epoch_{:04d}_image.png'.format(dir_path, epoch))
     else:
@@ -78,6 +88,8 @@ def save_data_inferred_ae(dir_path, data, data_inferred, epoch=-1):
         ax[i, 2].imshow(np.absolute(data[i, ..., 0] - data_inferred[i, ..., 0]))
 
     plt.tight_layout()
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
     if epoch > -1:
         fig.savefig('{}/epochs/epoch_{:04d}_image.png'.format(dir_path, epoch))
     else:
@@ -104,6 +116,8 @@ def save_data_nln_dists_combined(dir_path, neighbours, alpha, data, masks, x_hat
         axs[i, 4].imshow(nln_error[i, ..., 0].astype(np.float32), interpolation='nearest', aspect='auto')
         axs[i, 5].imshow(dists[i, ..., 0].astype(np.float32), vmin=0, vmax=1, interpolation='nearest', aspect='auto')
         axs[i, 6].imshow(combined[i, ..., 0].astype(np.float32), vmin=0, vmax=1, interpolation='nearest', aspect='auto')
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
     plt.savefig('{}/neighbours_{}_alpha_{}.png'.format(dir_path, neighbours, alpha), dpi=300)
 
 
@@ -123,6 +137,8 @@ def save_data_masks_dknn(dir_path, data_recon, masks_recon, dists_recon):
         #ax[i, 3].imshow(masks_recon[i, ..., 0] - dists_recon[i, ..., 0])
 
     plt.tight_layout()
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
     fig.savefig('{}/data_masks_image.png'.format(dir_path))
     plt.close('all')
 
@@ -248,16 +264,32 @@ def save_training_curves(model, args, test_images, test_labels, model_type):
                                                  args.model_name))
 
 
-def save_flops_metric(dir_path, flops, metrics, labels, params, file_name='flops_metric', ylabel='score'):
-    fig = plt.figure(figsize=(10, 10))
-    for flop, metric, label, p in zip(flops, metrics, labels, params):
-        flop /= 1e9
-        plt.scatter(flop, metric, label=label, s=3)
-        #plt.scatter(flop, f1, label=label, s=p) We need to rescale p first
+# def save_flops_metric(dir_path, flops, metrics, labels, params, file_name='flops_metric', ylabel='score'):
+#     fig = plt.figure(figsize=(10, 10))
+#     for flop, metric, label, p in zip(flops, metrics, labels, params):
+#         #flop /= 1e9
+#         s = 500 * (p/1e6 - 0.5)/15 + 50
+#         #plt.scatter(flop, metric, label=label, s=s)
+#         plt.scatter(flop, metric, s=s)
+#         #plt.text(flop*0.9, metric, label)
+#         #text_label = label + f'\n {round(p/1e6,3)}'
+#         text_label = label
+#         plt.text(flop*0.9, metric, text_label, fontsize=15)
+#         #plt.text(flop * 0.9, metric-0.01, round(p/1e6, 3))
+#         #plt.scatter(flop, f1, label=label, s=p) We need to rescale p first
+#
+#     plt.xscale('log')
+#     #plt.legend(fontsize=20)
+#     plt.xlabel('FLOPs', fontsize=30)
+#     plt.tick_params(axis='x', labelsize=20)
+#     plt.ylabel(ylabel, fontsize=30)
+#     plt.tick_params(axis='y', labelsize=20)
+#     plt.tight_layout()
+#     if not os.path.exists(dir_path):
+#         os.makedirs(dir_path)
+#     plt.savefig('{}/{}.png'.format(dir_path, file_name))
+#     plt.close('all')
 
-    plt.legend()
-    plt.xlabel('GFlops')
-    plt.ylabel(ylabel)
-    plt.tight_layout()
-    plt.savefig('{}/{}.png'.format(dir_path, file_name))
-    plt.close('all')
+
+
+

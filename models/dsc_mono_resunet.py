@@ -21,7 +21,7 @@ def DSC_MONO_RESUNET(args):
     dsc_unet_0 = GenericUnet(height, level_block=res_block)
     x = dsc_unet_0(input_data)
 
-    x = GenericBlock('ca', filters=1, kernel_size=1, activation='sigmoid')(x)
+    x = GenericBlock('ca', filters=1, kernel_size=1, activation=args.final_activation)(x)
 
     model = tf.keras.Model(inputs=[input_data], outputs=[x])
     return model

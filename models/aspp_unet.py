@@ -21,7 +21,7 @@ def ASPP_UNET(args):
                             dropout=args.dropout, kernel_regularizer=args.kernel_regularizer)
     x = GenericUnet(height, level_block=level_block)(input_data)
 
-    x = GenericBlock('ca', 1, kernel_size=1, strides=1, activation='sigmoid')(x)
+    x = GenericBlock('ca', 1, kernel_size=1, strides=1, activation=args.final_activation)(x)
 
     model = tf.keras.Model(inputs=[input_data], outputs=[x])
     return model

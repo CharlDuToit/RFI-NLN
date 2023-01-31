@@ -87,7 +87,7 @@ def RNET(args):
                      strides=1,
                      activation='relu',
                      kernel_regularizer=args.kernel_regularizer)(x7)
-    x = GenericBlock('ca', 1, kernel_size=1, strides=1, activation='sigmoid')(x)
+    x = GenericBlock('ca', 1, kernel_size=1, strides=1, activation=args.final_activation)(x)
 
     model = tf.keras.Model(inputs=[input_data], outputs=[x])
     return model

@@ -2,7 +2,7 @@ import argparse
 import os
 #from utils.data import sizes
 from coolname import generate_slug as new_name
-from .hardcoded_args import resolve_model_config_args
+#from .hardcoded_args import resolve_model_config_args
 
 """
     Pretty self explanatory, gets arguments for training and adds them to config
@@ -25,9 +25,16 @@ parser = argparse.ArgumentParser(description='Train generative anomaly detection
 parser.add_argument('-model', metavar='-m', type=str, default='AE',
                     choices={'AC_UNET', 'UNET', 'AE', 'DAE', 'DKNN', 'RNET', 'CNN_RFI_SUN', 'RFI_NET', 'AE-SSIM', 'DSC_DUAL_RESUNET', 'DSC_MONO_RESUNET', 'ASPP_UNET'},
                     help='Which model to train and evaluate')
+parser.add_argument('-task', metavar='-t', type=str, default='train',
+                    choices={'train', 'eval', 'infer', 'transfer_train'},
+                    help='Task to perform')
+parser.add_argument('-model_name', metavar='-mn', type=str, default='None',
+                    help='Name of already existing model with checkpoint from which to do inference')
+parser.add_argument('-parent_model_name', metavar='-pmn', type=str, default='None',
+                    help='Name of already existing model with checkpoint from which to continue training')
 parser.add_argument('-limit', metavar='-l', type=str, default='None',
                     help='Limit on the number of samples in training data ')
-parser.add_argument('-anomaly_class', metavar='-a', type=str, default=2,
+parser.add_argument('-anomaly_class', metavar='-a', type=str, default='rfi',
                     help='The labels of the anomalous class')
 parser.add_argument('-anomaly_type', metavar='-at', type=str, default='MISO',
                     choices={'MISO', 'SIMO'}, help='The anomaly scheme whether it is MISO or SIMO')
@@ -46,7 +53,7 @@ parser.add_argument('-radius', metavar='-r', type=float, nargs='+', default=[0.1
 parser.add_argument('-algorithm', metavar='-nn', type=str, choices={"frnn", "knn"},
                     default='knn', help='The algorithm for calculating neighbours')
 parser.add_argument('-data', metavar='-d', type=str, default='HERA',
-                    choices={'HERA', 'HERA_PHASE', 'LOFAR', 'MNIST', 'CIFAR10', 'FASHION_MNIST'},
+                    #choices={'HERA', 'HERA_PHASE', 'LOFAR', 'MNIST', 'CIFAR10', 'FASHION_MNIST', 'ASTRON_0'},
                     help='The dataset for training and testing the model on')
 parser.add_argument('-data_path', metavar='-mp', type=str, default='./data',
                     help='Path to MVTecAD training data')
@@ -93,9 +100,9 @@ parser.add_argument('-model_config', metavar='-mcf', type=str, default='args',
                     help='Which args to overwrite with default set.')
 parser.add_argument('-dropout', metavar='-drop', type=float, default=0.0,
                     help='Dropout rate between 0 and 1')
-parser.add_argument('-batch_size', metavar='-bas', type=int, default=1024,
+parser.add_argument('-batch_size', metavar='-bas', type=int, default=64,
                     help='Batch size')
-parser.add_argument('-buffer_size', metavar='-bus', type=int, default=2**13,
+parser.add_argument('-buffer_size', metavar='-bus', type=int, default=2**10,
                     help='Buffer size')
 parser.add_argument('-optimal_alpha', metavar='-oalpha', type=str2bool, default=True,
                     help='Replace args.alphas with list of one alpha which is optimized for args.data for AE')
@@ -113,15 +120,32 @@ parser.add_argument('-kernel_regularizer', metavar='-kr', type=str, default='Non
                     help='Kernel regularizer')
 parser.add_argument('-input_channels', metavar='-ch', type=int, default=0,
                     help='Number of channels to extract from data. 0 will extract all channels')
+parser.add_argument('-dilation_rate', metavar='-dilr', type=int, default=3,
+                    help='Dilation rate for AC_UNET and ASPP_UNET')
+parser.add_argument('-epoch_image_interval', metavar='-eii', type=int, default=5,
+                    help='Epoch interval for which to save training images')
+parser.add_argument('-images_per_epoch', metavar='-ipe', type=int, default=1,
+                    help='How many images to save per epoch')
+parser.add_argument('-early_stop', metavar='-es', type=int, default=20,
+                    help='Early stopping for validation loss')
+parser.add_argument('-split_seed', metavar='-ss', type=str, default='None',
+                    help='Seed to split data into training and validation. Default is random')
+parser.add_argument('-val_split', metavar='-vs', type=float, default=0.2,
+                    help='Validation split')
+parser.add_argument('-final_activation', metavar='-fa', type=str, default='sigmoid',
+                    help='Final activation function')
+parser.add_argument('-output_path', metavar='-op', type=str, default='./outputs',
+                    help='Path where models are saved')
+parser.add_argument('-save_dataset', metavar='-sd', type=str2bool, default=False,
+                    help='Save entire inferred dataset')
 
 args = parser.parse_args()
-args.model_name = new_name()
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = args.debug
-args.dilation_rate = 1
+
+#args.dilation_rate = 1
 
 """
 input_shape and raw_input_shape is no longer hardcoded.
-resolve_model_config_args will change the patch size if args.model_config != 'args'
 a DataCollection is initialized with args, using args.patch_x as well as other args members
 raw_input_shape is available from a DataCollection instance after it has called dc.load_raw_data()
 args.input_channels limits the number of channels extracted during dc.load_raw_data()
@@ -129,8 +153,7 @@ args.input_channels == 0 will extract all available channels from the data
 input_shape is available from a DataCollection instance after it has called dc.preprocess()
 in main.py args is populated with these shapes from a DataCollection instance
 """
-args.input_shape = None
-args.raw_input_shape = None
+
 # if args.data == 'MNIST' or args.data == 'FASHION_MNIST':
 #     args.raw_input_shape = (28, 28, 1)
 #
@@ -169,6 +192,33 @@ args.raw_input_shape = None
 # if args.crop:
 #     args.input_shape = (args.crop_x, args.crop_y, args.input_shape[-1])
 
+args.input_shape = None
+args.raw_input_shape = None
+
+if args.model not in ['AC_UNET', 'ASPP_UNET']:
+    args.dilation_rate = 1
+
+if args.model_name != 'None' and args.parent_model_name != 'None':
+    raise ValueError('Only model_name or parent_model_name may be given, not both')
+
+if args.task == 'transfer_train':
+    if args.parent_model_name == 'None':
+        raise ValueError('Parent model name required for transfer training')
+if args.task in ['infer', 'eval']:
+    if args.model_name == 'None':
+        raise ValueError('Model name required for inference or evaluation')
+
+if args.model_name == 'None':
+    args.model_name = new_name()
+
+if args.parent_model_name == 'None':
+    args.parent_model_name = None
+
+if args.split_seed == 'None':
+    args.split_seed = None
+else:
+    args.split_seed = int(args.split_seed)
+
 if args.limit == 'None':
     args.limit = None
 else:
@@ -185,4 +235,4 @@ if ((args.data == 'MNIST') or
         (args.data == 'FASHION_MNIST')):
     args.anomaly_class = int(args.anomaly_class)
 
-args = resolve_model_config_args(args)
+#args = resolve_model_config_args(args)

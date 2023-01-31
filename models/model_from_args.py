@@ -9,7 +9,7 @@ from .dsc_mono_resunet import DSC_MONO_RESUNET
 from .aspp_unet import ASPP_UNET
 from .dknn import DKNN
 
-from utils.hardcoded_args import resolve_model_config_args
+#from utils.hardcoded_args import resolve_model_config_args
 
 
 def get_model_from_args(args):

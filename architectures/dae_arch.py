@@ -8,7 +8,7 @@ import tensorflow as tf
 
 class DAEArchitecture(AEArchitecture):
 
-    def __init__(self, model, args):
+    def __init__(self, model, args, checkpoint='None'):
         # model must be (Autoencoder, discriminator)
         super(DAEArchitecture, self).__init__(model, args)
         self.loss_func = None  # we want more spesific names
@@ -17,8 +17,12 @@ class DAEArchitecture(AEArchitecture):
         self.ae_optimizer = tf.keras.optimizers.Adam(1e-4)
         self.discriminator_optimizer = tf.keras.optimizers.Adam(1e-5)
         self.generator_optimizer = tf.keras.optimizers.Adam(1e-5)
-        self.model = model[0]  # Auto encoder
-        self.discriminator = model[1]  # discriminator
+        if model is not None:
+            self.model = model[0]  # Auto encoder
+            self.discriminator = model[1]  # discriminator
+        else:
+            self.model = None
+            self.discriminator = None
 
     def ae_loss(self, x, x_hat):
         return self.mse(x, x_hat)

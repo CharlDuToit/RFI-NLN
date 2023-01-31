@@ -16,7 +16,7 @@ def save_all_summaries():
         for mdl in ['UNET', 'AC_UNET', 'RNET', 'RFI_NET', 'DSC_DUAL_RESUNET', 'DSC_MONO_RESUNET', 'ASPP_UNET']:
         #for mdl in ['UNET']:
             args.args.model = mdl
-            args.args = resolve_model_config_args(args.args)
+            #args.args = resolve_model_config_args(args.args)
             model = get_model_from_args(args.args)
             save_summary_to_folder(model, mc_folder, args.args)
 

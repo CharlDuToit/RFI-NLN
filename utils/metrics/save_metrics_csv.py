@@ -8,6 +8,7 @@ import pandas as pd
 #from utils.data import reconstruct
 
 
+# SHOULD BE WEENED OUT
 def save_metrics_csv(model_type,
                      train_data,
                      test_masks,
@@ -139,6 +140,7 @@ def save_metrics_csv(model_type,
                                                  args.seed), index=False)
 
 
+# DEPRECIATED
 def save_results_csv(data_name, seed, results_dict):
     none_dict = empty_dict()
     save_dict = {**none_dict, **results_dict}
@@ -157,10 +159,12 @@ def save_results_csv(data_name, seed, results_dict):
     #perc = round(((np.sum(test_masks) - np.sum(test_masks_orig)) / np.prod(test_masks_orig.shape)), 3)
 
 
+# DEPRECIATED
 def empty_dict():
     return {
         'model': None,
         'name': None,
+        'parent_name': None,
         'data': None,
         'anomaly_class': None,
         'anomaly_type': None,
@@ -170,11 +174,13 @@ def empty_dict():
         'limit': None,
         'num_train': None,
         'num_val': None,
+        'split_seed': None,
         'use_hyp_data': None,
         'epochs': None,
         'batch_size': None,
         'dropout': None,
         'kernel_regularizer': None,
+        'final_activation': None,
 
         'raw_input_shape': None,
         'input_shape': None,
@@ -200,6 +206,10 @@ def empty_dict():
         'height': None,
         'level_blocks': None,
         'dilation_rate': None,
+
+        'early_stop': None,
+        #'first_epoch': None,
+        #'best_epoch': None,
 
         'trainable_params': None,
         'nontrainable_params': None,

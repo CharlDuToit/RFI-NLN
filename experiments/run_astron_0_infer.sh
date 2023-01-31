@@ -1,52 +1,35 @@
 #!/bin/bash
-echo "Logging for run_lofar.sh at time: $(date)." >> lofar.log
+echo "Logging for run_astron_0_infer.sh at time: $(date)." >> astron_0.log
 
-limit=None
-epochs=150
-percentage=0.0
 seed=$(openssl rand -hex 3)
 d=$(date +'%m-%d-%Y-%I-%M_')
-atype=MISO
-ld=32
-patch=32
-threshold=None
-data=LOFAR
-use_hyp_data=False
-anomaly_class=rfi
-model_config=common
-loss=bce
-lr=1e-4
-#data_path=./data
-data_path=/home/ee487519/DatasetsAndConfig/Given/43_Mesarcik_2022/
 
 # -data_path /home/ee487519/DatasetsAndConfig/Given/43_Mesarcik_2022/ \
 # -data_path ./data \
 
-#for model in UNET DAE RNET RFI_NET
-for model in UNET
-do
-		for repeat in 1
-		do
-		python3 -u main.py -model $model\
-				  -limit $limit\
-				  -data $data\
-				  -data_path $data_path \
-				  -anomaly_class $anomaly_class\
-				  -anomaly_type $atype\
-				  -epochs $epochs \
-				  -latent_dim $ld \
-				  -rfi_threshold $threshold\
-				  -lr $lr \
-				  -loss $loss \
-				  -model_config $model_config \
-				  -use_hyp_data $use_hyp_data \
-				  -neighbours 20\
-				  -algorithm knn\
-				  -kernel_regularizer None\
-				  -dropout 0.0\
-				  -input_channels 1\
-				  -seed $d$seed > >(tee -a lofar.log) 2>&1
-		done 
-done
+size=64
 
-echo "Completed run_lofar.sh at time: $(date)." >> lofar.log	
+python3 -u main.py -model UNET\
+          -model_name rational-polar-groundhog-of-judgment\
+          -task infer\
+				  -data ASTRON_0\
+				  -data_path /home/ee487519/DatasetsAndConfig/Given/ASTRON/ \
+				  -anomaly_class rfi\
+				  -anomaly_type MISO\
+				  -use_hyp_data False\
+				  -output_path ./outputs/LOFAR_nonhyp\
+				  -val_split 0.0\
+				  -images_per_epoch 10\
+				  -batch_size 64\
+				  -patches True\
+				  -patch_x $size\
+				  -patch_y $size\
+				  -patch_stride_x $size\
+				  -patch_stride_y $size\
+				  -height 4\
+				  -filters 64\
+				  -loss bce\
+				  -final_activation sigmoid\
+				  -seed $d$seed > >(tee -a astron_0.log) 2>&1
+
+echo "Completed run_astron_0_infer.sh at time: $(date)." >> astron_0.log

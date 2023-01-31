@@ -156,7 +156,7 @@ def RFI_NET(args):
     x = GenericUnet(height, level_block=level_block)(x)
 
     # removed batchnorm from table 1, i.e. no longer cba
-    x = GenericBlock('ca', 1, activation='sigmoid', kernel_size=1, strides=1)(x)  # look at table 1
+    x = GenericBlock('ca', 1, activation=args.final_activation, kernel_size=1, strides=1)(x)  # look at table 1
     #x = layers.Conv2D(1, (1, 1), activation='sigmoid')(x) # table 1 used 3x3 conv with softmax activation
     model = tf.keras.Model(inputs=[input_data], outputs=[x])
     return model

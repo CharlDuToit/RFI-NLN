@@ -1,21 +1,23 @@
-from utils.metrics import save_results_csv, DiceLoss, f1, auroc, auprc
+from utils.metrics import  DiceLoss, f1, auroc, auprc, save_csv
 from utils.profiling import num_trainable_params, num_non_trainable_params, get_flops
 
 from utils.training import print_epoch, save_checkpoint
 # from model_config import *
 from tensorflow.keras import optimizers
 from tensorflow.keras import losses
+from scipy.io import savemat
 
-from utils.plotting import save_training_metrics, save_data_masks_inferred
+from utils.plotting import save_epochs_curve, save_data_masks_inferred, save_data_inferred
 from data_collection import DataCollection
 
-from utils.data import patches
+# from utils.data import patches
 import time
 import os
 import numpy as np
-from matplotlib import pyplot as plt
+# from matplotlib import pyplot as plt
 import random
 import tensorflow as tf
+
 
 # from sklearn.metrics import (roc_curve,
 #                              auc,
@@ -28,7 +30,9 @@ import tensorflow as tf
 
 
 class GenericArchitecture:
-    def __init__(self, model, args):
+    def __init__(self, model, args, checkpoint='None'):
+        """checkpoint must be in ['None', 'self', 'parent']"""
+
         self.model = model
 
         self.loss = args.loss
@@ -43,54 +47,94 @@ class GenericArchitecture:
         self.lr = args.lr
         self.optimizer = optimizers.Adam(lr=self.lr)
 
-        self.val_loss = None
-        self.train_loss = None
-        self.val_auroc = None
-        self.val_auprc = None
-        self.val_f1 = None
+        self.early_stop = args.early_stop
+        self.final_activation = args.final_activation
 
-        self.last_epoch = None
-        self.epoch_time = 0.0
-
-        self.num_train = 0
-        self.num_val = 0
-        self.val_split = 0.2
-        self.num_samples = 10  # for saving images, must be smaller than batch size
+        self.val_split = args.val_split
+        self.split_seed = args.split_seed
+        self.num_samples = args.images_per_epoch  # for saving images, must be smaller than batch size
+        self.epoch_image_interval = args.epoch_image_interval
+        self.save_dataset = args.save_dataset
 
         self.use_hyp_data = args.use_hyp_data
         self.algorithm = args.algorithm
         self.model_name = args.model_name
+        self.parent_model_name = args.parent_model_name
         self.anomaly_class = args.anomaly_class
-        self.dilation_rate = args.dilation_rate
-        self.dropout = args.dropout
-        self.kernel_regularizer = args.kernel_regularizer
 
         self.epochs = args.epochs
         self.model_type = args.model
         self.batch_size = args.batch_size
         self.buffer_size = args.buffer_size
-        self.dir_path = 'outputs/{}/{}/{}'.format(self.model_type, self.anomaly_class, self.model_name)
+        self.dir_path = '{}/{}/{}/{}'.format(args.output_path, self.model_type, self.anomaly_class, self.model_name)
+        #self.dir_path = 'outputs/{}/{}/{}'.format(self.model_type, self.anomaly_class, self.model_name)
+
         self.latent_dim = args.latent_dim
         self.neighbours = args.neighbours
         self.alphas = args.alphas
+
+        # These have nothing to do with training, only how the model was built
+        self.dilation_rate = args.dilation_rate
+        self.dropout = args.dropout
+        self.kernel_regularizer = args.kernel_regularizer
         self.height = args.height
         self.filters = args.filters
         self.model_config = args.model_config
         self.level_blocks = args.level_blocks
+
         if not os.path.exists(self.dir_path):
             os.makedirs(self.dir_path)
         if not os.path.exists(self.dir_path + '/epochs'):
             os.makedirs(self.dir_path + '/epochs')
-        if not os.path.exists(self.dir_path + '/training_checkpoints'):
-            os.makedirs(self.dir_path + '/training_checkpoints')
         if not os.path.exists(self.dir_path + '/losses'):
             os.makedirs(self.dir_path + '/losses')
+        if not os.path.exists(self.dir_path + '/training_checkpoints'):
+            os.makedirs(self.dir_path + '/training_checkpoints')
 
-    def save_summary(self):
-        with open(self.dir_path + '/model.summary', 'w') as f:
-            self.model.summary(print_fn=lambda x: f.write(x + '\n'))
-            f.write(f'GFLOPS patch: {get_flops(self.model) / 1e9}')
+        if checkpoint == 'self':
+            self.load_checkpoint()
 
+        #self.parent_loss = None
+        if checkpoint == 'parent':
+            if self.parent_model_name is None:
+                raise ValueError('Cant load parent checkpoint if parent name is None')
+            parent_args = EmptyArchArgs(self.parent_model_name, self.anomaly_class, self.model_type)
+            parent_arch = GenericArchitecture(self.model, parent_args, checkpoint='None')
+            parent_arch.load_checkpoint()
+            self.model = parent_arch.model
+            self.save_checkpoint()
+            #self.first_epoch = parent_arch.get_best_epoch() + 1
+
+            # try:
+            #     with open(self.dir_path + '/losses/val_epoch_losses.txt', 'w') as f:
+            #         parent_val_losses = parent_arch.get_losses('val')
+            #         self.parent_loss = np.min(parent_val_losses)
+            #         for i in range(0, self.first_epoch):
+            #             f.write(f'{parent_val_losses[i]}\n')
+            # except:
+            #     print('Parent validation loss text file error')
+            #
+            # with open(self.dir_path + '/losses/train_epoch_losses.txt', 'w') as f:
+            #     parent_train_losses = parent_arch.get_losses('train')
+            #     if self.parent_loss is not None:
+            #         self.parent_loss = np.min(parent_train_losses)
+            #     for i in range(0, self.first_epoch):
+            #         f.write(f'{parent_train_losses[i]}\n')
+
+        # non arg dependant members
+        self.val_loss = None
+        self.train_loss = None
+        self.val_auroc = None
+        self.val_auprc = None
+        self.val_f1 = None
+        self.num_train = 0
+        self.num_val = 0
+        self.last_epoch = 0
+        #self.best_epoch = 0
+        #self.first_epoch = 0
+        self.epoch_time = 0.0
+
+    # ------------------------------------------------------------------------------------------------------------------
     @tf.function
     def train_step(self, x, y):
         """Executes one training step and returns the loss.
@@ -105,6 +149,7 @@ class GenericArchitecture:
         self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
         return loss
 
+    # ------------------------------------------------------------------------------------------------------------------
     def train(self, data_collection: DataCollection):
         # Create dataset
 
@@ -113,11 +158,13 @@ class GenericArchitecture:
          train_mask_dataset,
          val_mask_dataset,
          self.num_train,
-         self.num_val) = data_collection.get_datasets(self.val_split,
-                                                      self.use_hyp_data,
-                                                      False,
-                                                      self.buffer_size,
-                                                      self.batch_size)
+         self.num_val,
+         self.split_seed) = data_collection.get_datasets(self.val_split,
+                                                         self.use_hyp_data,
+                                                         False,
+                                                         self.buffer_size,
+                                                         self.batch_size,
+                                                         self.split_seed)
         use_val_data = (val_data_dataset is not None)
         print('Created tf batched datasets')
 
@@ -147,6 +194,9 @@ class GenericArchitecture:
             train_loss = (train_loss / self.num_train).numpy()  # divide by number of observations
             train_losses.append(train_loss)
 
+            with open(self.dir_path + '/losses/train_epoch_losses.txt', 'a+') as f:
+                f.write(f'{train_loss}\n')
+
             # Calculate validation loss
             val_loss = None
             if use_val_data:
@@ -161,34 +211,34 @@ class GenericArchitecture:
                 with open(self.dir_path + '/losses/val_epoch_losses.txt', 'a+') as f:
                     f.write(f'{val_loss}\n')
 
-            with open(self.dir_path + '/losses/train_epoch_losses.txt', 'a+') as f:
-                f.write(f'{train_loss}\n')
-
             self.print_epoch(epoch, time.time() - start, [train_loss, val_loss],
                              ['train loss', 'val loss'])
 
-            # Save 10 inferred images
-            data_save = save_image_batch[:self.num_samples].numpy()
-            masks_save = save_mask_batch[:self.num_samples].numpy()
-            masks_inferred = self.infer(data_save)
-            self.save_data_images(data_save,
-                                  masks_save,
-                                  masks_inferred,
-                                  epoch)
+            # Save inferred images
+            if self.epoch_image_interval > 0 and self.num_samples > 0 and epoch % self.epoch_image_interval == 0:
+                data_save = save_image_batch[:self.num_samples].numpy()
+                masks_save = save_mask_batch[:self.num_samples].numpy()
+                masks_inferred = self.infer(data_save)
+                self.save_data_masks_images(data_save,
+                                            masks_save,
+                                            masks_inferred,
+                                            epoch)
 
             # Save checkpoint if lowest loss thus far
             losses = train_losses
             if use_val_data:
                 losses = val_losses
+            # if self.parent_loss is not None:
+            #     losses = [self.parent_loss] + losses
             self.save_checkpoint(epoch, self.model_type, losses)
-            if np.argmin(losses) + 20 < len(losses):  # No improvement for 20 epochs
-                print('No improvement for 20 epochs, stopping training')
+            if np.argmin(losses) + self.early_stop < len(losses):  # No improvement for 20 epochs
+                print(f'No improvement for {self.early_stop} epochs, stopping training')
                 break
 
         # END for epoch in range(self.epochs):
         train_time = time.time() - train_start
-        self.last_epoch = epoch + 1
-        self.epoch_time = train_time / self.last_epoch
+        self.last_epoch = epoch #+ self.first_epoch
+        self.epoch_time = train_time / (epoch + 1)
 
         print('__________________________________')
         print(f'Total training time: {train_time // 60} min')
@@ -215,23 +265,7 @@ class GenericArchitecture:
         val_masks_inferred[val_masks_inferred == np.inf] = np.finfo(val_masks_inferred.dtype).max
         self.val_auroc, self.val_auprc, self.val_f1 = self.get_metrics(val_masks, val_masks_inferred)
 
-
-    def print_epoch(self, epoch, _time, metrics, metric_labels):
-        print_epoch(self.model_type, epoch, _time, metrics, metric_labels)
-
-    def save_training_metrics_image(self, metrics, metric_labels):
-        save_training_metrics(self.dir_path, metrics, metric_labels)
-
-    def save_checkpoint(self, epoch=-1, model_subtype=None, losses=None):
-        if model_subtype is None:
-            model_subtype = self.model_type
-        save_checkpoint(self.dir_path, self.model, model_subtype, epoch, losses)
-
-    def save_data_images(self, data, masks, masks_inferred, epoch=-1, thresh=-1.0):
-        if 0.0 < thresh < 1.0:
-            masks_inferred = (masks_inferred > thresh).astype(np.float32)
-        save_data_masks_inferred(self.dir_path, data, masks, masks_inferred, epoch, thresh)
-
+    # ------------------------------------------------------------------------------------------------------------------
     def infer(self, data):
         # data is a numpy ndarray or 'TensorSliceDataset'
         # output is np.ndarray
@@ -259,10 +293,13 @@ class GenericArchitecture:
         output[output == np.inf] = np.finfo(output.dtype).max
         return output
 
+    # ------------------------------------------------------------------------------------------------------------------
     def evaluate_and_save(self, dc: DataCollection):
 
         # Infer data
+        print("__________________________________ \nEvaluating data")
         start = time.time()
+
         test_masks_inferred = self.infer(dc.test_data)
         infer_time = time.time() - start
         time_patch = infer_time / dc.test_data.shape[0]  # per patch
@@ -279,13 +316,12 @@ class GenericArchitecture:
         save_masks = test_masks_recon[inds]
         save_masks_inferred = test_masks_inferred_recon[inds]
 
-        self.save_data_images(save_data, save_masks, save_masks_inferred)
-        self.save_data_images(save_data, save_masks, save_masks_inferred, thresh=0.5)
+        self.save_data_masks_images(save_data, save_masks, save_masks_inferred)
+        self.save_data_masks_images(save_data, save_masks, save_masks_inferred, thresh=0.5, figsize=(40,80))
 
         # Generate and save metrics
         test_auroc, test_auprc, test_f1 = self.get_metrics(dc.test_masks, test_masks_inferred)  # this takes some time
         test_metrics_dict = {'test_auroc': test_auroc, 'test_auprc': test_auprc, 'test_f1': test_f1}
-
 
         arch_dict = self.to_dict()
         data_dict = dc.to_dict()
@@ -297,11 +333,77 @@ class GenericArchitecture:
                    'flops_patch': flops_patch,
                    'flops_image': flops_image,
                    }
-        save_results_csv(dc.data_name, dc.seed, results)
+        save_csv(dc.data_name, dc.seed, results)
 
         # Save solution and model info
         self.save_summary()
         self.save_solution_config({**arch_dict, **data_dict})
+
+        # Save inferred dataset
+        if self.save_dataset:
+            path = os.path.join(self.dir_path, 'inferred', dc.data_name)
+            masks_dict = {'masks_inferred': test_masks_recon}
+            mat_file = os.path.join(path, 'masks_inferred.mat')
+            savemat(mat_file, masks_dict)
+
+        print('Data Evaluation time : {:.2f} sec'.format(time.time() - start))
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def infer_and_save_train_data(self, dc: DataCollection):
+        """
+        infers the training data and saves it
+        """
+
+        masks_inferred = self.infer(dc.train_data)
+
+        masks_inferred_recon = dc.reconstruct(masks_inferred)
+        data_recon = dc.reconstruct(dc.train_data)
+
+        if self.num_samples < len(data_recon):
+            inds = random.sample(range(len(data_recon)), self.num_samples)
+        else:
+            inds = range(len(data_recon))
+
+        save_data = data_recon[inds]
+        save_masks_inferred = masks_inferred_recon[inds]
+
+        path = os.path.join(self.dir_path, 'inferred', dc.data_name)
+        save_data_inferred(path, save_data, save_masks_inferred, thresh=-1)
+        save_data_inferred(path, save_data, (save_masks_inferred > 0.5).astype(np.float32), thresh=0.5, figsize=(80,40))
+
+        if self.save_dataset:
+            masks_dict = {'masks_inferred': masks_inferred_recon}
+            mat_file = os.path.join(path, 'masks_inferred.mat')
+            savemat(mat_file, masks_dict)
+
+        # =============================================HELPERS==============================================================
+
+    def save_summary(self):
+        with open(self.dir_path + '/model.txt', 'w') as f:
+            self.model.summary(print_fn=lambda x: f.write(x + '\n'))
+            f.write(f'GFLOPS patch: {get_flops(self.model) / 1e9}')
+
+    def print_epoch(self, epoch, _time, metrics, metric_labels):
+        print_epoch(self.model_type, epoch, _time, metrics, metric_labels)
+
+    def save_training_metrics_image(self, metrics, metric_labels):
+        save_epochs_curve(self.dir_path, metrics, metric_labels)
+
+
+    def save_checkpoint(self, epoch=-1, model_subtype=None, losses=None):
+        if model_subtype is None:
+            model_subtype = self.model_type
+        save_checkpoint(self.dir_path, self.model, model_subtype, epoch, losses)
+
+    def save_data_masks_images(self, data, masks, masks_inferred, epoch=-1, thresh=-1.0, figsize=(10,20)):
+        if 0.0 < thresh < 1.0:
+            masks_inferred = (masks_inferred > thresh).astype(np.float32)
+        save_data_masks_inferred(self.dir_path, data, masks, masks_inferred, epoch, thresh, figsize)
+
+    def save_data_images(self, data, masks_inferred, thresh=-1.0):
+        if 0.0 < thresh < 1.0:
+            masks_inferred = (masks_inferred > thresh).astype(np.float32)
+        save_data_inferred(self.dir_path, data, masks_inferred, thresh)
 
     def save_solution_config(self, sol_dict):
         with open('{}/solution.config'.format(self.dir_path), 'w') as fp:
@@ -313,13 +415,33 @@ class GenericArchitecture:
 
     def load_checkpoint(self):
         # Note that the correct name must be in args when initializing Architecture
-        #path = f'{self.dir_path}/training_checkpoints/checkpoint_full_model_{self.model_type}'
+        # path = f'{self.dir_path}/training_checkpoints/checkpoint_full_model_{self.model_type}'
         path = f'{self.dir_path}/training_checkpoints/checkpoint_{self.model_type}'
         self.model.load_weights(path)
+
+    def get_losses(self, prefix='val'):
+        """ prefix must be in ['val', 'train']. Child classes can have more options"""
+        losses_list = []
+        with open(f'{self.dir_path}/{prefix}_epoch_losses.txt', 'r') as f:
+            losses_list.append([float(line.rstrip()) for line in f])
+        return losses_list
+
+    # def get_best_epoch(self):
+    #     try:
+    #         best_epoch = np.argmin(self.get_losses('val'))
+    #         return best_epoch
+    #     except:
+    #         print('Failed to load validation losses from text file, trying training loss')
+    #     try:
+    #         best_epoch = np.argmin(self.get_losses('train'))
+    #         return best_epoch
+    #     except:
+    #         raise FileNotFoundError('Failed to load losses')
 
     def to_dict(self):
         return {'model': self.model_type,
                 'name': self.model_name,
+                'parent_name': self.parent_model_name,
                 'height': self.height,
                 'filters': self.filters,
                 'level_blocks': self.level_blocks,
@@ -331,19 +453,58 @@ class GenericArchitecture:
                 'use_hyp_data': self.use_hyp_data,
                 'num_train': self.num_train,
                 'num_val': self.num_val,
+                'split_seed': self.split_seed,
                 'epoch_time': self.epoch_time,
                 'lr': self.lr,
                 'loss': self.loss,
                 'epochs': self.epochs,
+                #'first_epoch': self.first_epoch,
+                #'best_epoch': self.get_best_epoch(),
                 'last_epoch': self.last_epoch,
                 'dilation_rate': self.dilation_rate,
                 'batch_size': self.batch_size,
                 'dropout': self.dropout,
-                'kernel_regularizer' : self.kernel_regularizer,
-                'val_loss' : self.val_loss,
+                'kernel_regularizer': self.kernel_regularizer,
+                'final_activation': self.final_activation,
+                'early_stop': self.early_stop,
+                'val_loss': self.val_loss,
                 'train_loss': self.train_loss,
                 'val_auprc': self.val_auprc,
                 'val_auroc': self.val_auroc,
                 'val_f1': self.val_f1,
+
                 # 'flops_patch': get_flops(self.model) / 1e9
                 }
+
+
+class EmptyArchArgs:
+    def __init__(self, model_name, anomaly_class, model_type):
+
+        self.model_name = model_name
+        self.anomaly_class = anomaly_class
+        self.model = model_type
+
+        self.height = 0
+        self.filters = 0
+        self.level_blocks = 0
+        self.parent_model_name = None
+        self.model_config = None
+        self.use_hyp_data = None
+        self.loss = 'bce'
+        self.lr = 0.001
+        self.early_stop = 0
+        self.images_per_epoch = 0
+        self.epoch_image_interval = 0
+        self.final_activation = None
+        self.val_split = 0
+        self.split_seed = 0
+        self.algorithm = None
+        self.dilation_rate = 0
+        self.dropout = 0
+        self.kernel_regularizer = None
+        self.epochs = 0
+        self.batch_size = 0
+        self.buffer_size = 0
+        self.latent_dim = 0
+        self.neighbours = 0
+        self.alphas = 0

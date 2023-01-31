@@ -5,7 +5,7 @@ from models import (Autoencoder,
                     Discriminator)
 
 from utils.plotting  import  (generate_and_save_images,
-                              save_training_metrics,
+                              save_epochs_curve,
                               save_training_curves)
 
 from utils.training import print_epoch,save_checkpoint
@@ -110,7 +110,7 @@ def train(ae,discriminator, train_dataset,test_images,test_labels,args):
 
     save_checkpoint(dir_path, ae, 'AE')
     save_checkpoint(dir_path, discriminator, 'DISC')
-    save_training_metrics(dir_path, [ae_loss, d_loss, g_loss], ['AE loss', 'DISC loss', 'GEN loss'])
+    save_epochs_curve(dir_path, [ae_loss, d_loss, g_loss], ['AE loss', 'DISC loss', 'GEN loss'])
 
    # save_training_metrics_image([ae_loss, d_loss, g_loss],
     #                            ['ae loss','disc loss','gen loss'],

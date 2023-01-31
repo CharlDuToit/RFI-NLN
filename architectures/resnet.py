@@ -4,7 +4,7 @@ import os
 from models import  Autoencoder
 
 from utils.plotting  import  (generate_and_save_images,
-                              save_training_metrics)
+                              save_epochs_curve)
 
 from utils.training import print_epoch,save_checkpoint
 #from model_config import *

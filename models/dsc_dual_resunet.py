@@ -30,7 +30,7 @@ def DSC_DUAL_RESUNET(args):
     x = dsc_unet_1(x)
 
     #x = GenericBlock('c ca', filters=[args.filters, 1], kernel_size=[3, 1], activation='sigmoid')(x)
-    x = GenericBlock('ca', filters=1, kernel_size=1, activation='sigmoid')(x)
+    x = GenericBlock('ca', filters=1, kernel_size=1, activation=args.final_activation)(x)
 
     model = tf.keras.Model(inputs=[input_data], outputs=[x])
     return model

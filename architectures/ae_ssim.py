@@ -6,7 +6,7 @@ from models import (Encoder,
                    Autoencoder)
 
 from utils.plotting  import  (generate_and_save_images,
-                              save_training_metrics)
+                              save_epochs_curve)
 
 from utils.training import print_epoch,save_checkpoint
 from model_config import *
@@ -54,7 +54,7 @@ def train(ae,train_dataset,test_images,test_labels,args,verbose=True,save=True):
         print_epoch('AE_SSIM', epoch, time.time() - start, auto_loss.numpy(), 'loss')
 
     save_checkpoint(dir_path, ae, 'AE_SSIM')
-    save_training_metrics(dir_path, ae_loss, 'AE_SSIM loss')
+    save_epochs_curve(dir_path, ae_loss, 'AE_SSIM loss')
     #save_training_metrics_image([ae_loss],
     #                            ['ae loss'],
     #                            'AE_SSIM', args)
