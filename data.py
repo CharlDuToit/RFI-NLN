@@ -6,9 +6,9 @@ from tqdm import tqdm
 from model_config import BUFFER_SIZE,BATCH_SIZE
 from sklearn.model_selection import train_test_split
 from utils.flagging import flag_data
-from utils.data import (get_lofar_data, 
+from utils import (get_lofar_data,
                         get_hera_data,
-                        process,
+                        scale,
                         get_patches)
 
 
@@ -29,8 +29,8 @@ def load_hera(args):
 
     test_masks_orig = copy.deepcopy(test_masks)
     if args.rfi_threshold is not None:
-        test_masks = flag_data(test_data, args.data, args.rfi_threshold)
-        train_masks = flag_data(train_data, args.data, args.rfi_threshold)
+        test_masks = flag_data(test_data, args.data_name, args.rfi_threshold)
+        train_masks = flag_data(train_data, args.data_name, args.rfi_threshold)
         test_masks = np.expand_dims(test_masks,axis=-1) 
         train_masks = np.expand_dims(train_masks,axis=-1) 
 
@@ -38,13 +38,13 @@ def load_hera(args):
     _min = np.absolute(np.mean(test_data[np.invert(test_masks)]) - np.std(test_data[np.invert(test_masks)]))
     test_data = np.clip(test_data, _min, _max)
     test_data = np.log(test_data)
-    test_data = process(test_data, per_image=False)#.astype(np.float16)
+    test_data = scale(test_data, scale_per_image=False)#.astype(np.float16)
 
     _max = np.mean(train_data[np.invert(train_masks)])+4*np.std(train_data[np.invert(train_masks)])
     _min = np.absolute(np.mean(train_data[np.invert(train_masks)])-np.std(train_data[np.invert(train_masks)]))
     train_data = np.clip(train_data, _min, _max)
     train_data = np.log(train_data)
-    train_data = process(train_data, per_image=False)#.astype(np.float16)
+    train_data = scale(train_data, scale_per_image=False)#.astype(np.float16)
 
     if args.patches:
         p_size = (1,args.patch_x, args.patch_y, 1)
@@ -94,7 +94,7 @@ def load_lofar(args):
 
     """
 
-    train_data, train_masks, test_data, test_masks = get_lofar_data(args)
+    train_data, train_masks, test_data, test_masks = get_lofar_data(args.data_path)
 
 
     if args.limit is not None:
@@ -107,7 +107,7 @@ def load_lofar(args):
         #test_masks  = test_masks [test_indx]
 
     if args.rfi_threshold is not None:
-        train_masks = flag_data(train_data, args.data, args.rfi_threshold)
+        train_masks = flag_data(train_data, args.data_name, args.rfi_threshold)
         train_masks = np.expand_dims(train_masks,axis=-1) 
 
     _max = np.mean(test_data[np.invert(test_masks)])+95*np.std(test_data[np.invert(test_masks)])
@@ -115,11 +115,11 @@ def load_lofar(args):
 
     test_data = np.clip(test_data,_min,_max) 
     test_data = np.log(test_data)
-    test_data = process(test_data, per_image=False)
+    test_data = scale(test_data, scale_per_image=False)
 
     train_data = np.clip(train_data, _min,_max)
     train_data = np.log(train_data)
-    train_data = process(train_data, per_image=False)
+    train_data = scale(train_data, scale_per_image=False)
 
     if args.patches:
         p_size = (1,args.patch_x, args.patch_y, 1)

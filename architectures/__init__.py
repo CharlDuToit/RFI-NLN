@@ -9,5 +9,5 @@ from .dae import main as train_dae
 from .resnet import main as train_resnet
 from .cnn_rfi_sun import main as train_cnn_rfi_sun
 
-from .architecture_from_args import get_architecture_from_args
+from .architecture_from_args import load_architecture
 from .helper import end_routine

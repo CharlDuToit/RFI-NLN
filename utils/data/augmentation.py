@@ -2,11 +2,33 @@ import tensorflow as tf
 import numpy as np
 import copy
 from .patches import get_patches
+import cv2
 
+
+def corrupt_masks(masks, kernel_size=(5,5)):
+    """
+        Corrupts segmentation maps using cv2 morphology operators, only odd filter sizes work
+
+        Parameters
+        ----------
+        masks (np.array) array of rfi masks for data
+        kernel_size (tuple) the kernel size for the operator
+
+        Returns
+        -------
+        np.array
+    """
+    kernel = np.ones(kernel_size ,np.uint8)
+    _masks =  np.empty(masks.shape, dtype=np.bool)
+
+    for i,m in enumerate(masks):
+        img = cv2.cvtColor(m[...,0].astype(np.uint8), cv2.COLOR_GRAY2BGR)
+        out = cv2.morphologyEx(img, cv2.MORPH_BLACKHAT, kernel)
+        _masks[i,...,0] = out.astype(np.bool)[...,0]
+
+    return _masks
 
 # TODO this certainly is not the most efficient, pythonic, nor tensorflowic way of doing things
-
-
 def random_rotation(images, masks=None):
     """
         Applies random discrete rotation based augmentations to the test data and to their masks (if applicable)

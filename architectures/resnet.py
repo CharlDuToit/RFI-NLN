@@ -6,7 +6,7 @@ from models import  Autoencoder
 from utils.plotting  import  (generate_and_save_images,
                               save_epochs_curve)
 
-from utils.training import print_epoch,save_checkpoint
+from utils.training import print_epoch,save_checkpoint_to_path
 #from model_config import *
 from .helper import end_routine
 from inference import infer

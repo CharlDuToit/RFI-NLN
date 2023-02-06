@@ -1,4 +1,4 @@
-from utils.metrics import get_nln_metrics, save_metrics_csv, evaluate_performance  # , save_results_csv
+from utils import get_nln_metrics, save_metrics_csv, evaluate_performance  # , save_results_csv
 
 def end_routine(train_data,
                 test_data,

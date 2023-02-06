@@ -1,5 +1,5 @@
-from utils import args
-from data_collection import get_data_collection_from_args
+from utils import main_args
+from data_collection import load_data_collection
 #from utils.flagging import flag_data
 import time
 
@@ -13,15 +13,15 @@ def main():
     """
     # print(args.args)
     # return
-    args.args.data = 'LOFAR'
-    args.args.data_path = '/home/ee487519/DatasetsAndConfig/Given/43_Mesarcik_2022/'
+    main_args.args.data_name = 'LOFAR'
+    main_args.args.data_path = '/home/ee487519/DatasetsAndConfig/Given/43_Mesarcik_2022/'
     start = time.time()
     print('===============================================')
-    print("__________________________________ \nFetching and preprocessing data: {}".format(args.args.data))
-    data_collection = get_data_collection_from_args(args.args)
+    print("__________________________________ \nFetching and preprocessing data: {}".format(main_args.args.data_name))
+    data_collection = load_data_collection(main_args.args)
     data_collection.load_raw_data()
 
-    aof_masks = data_collection.flag_data(data_collection.test_data, args.args.data, '10')
+    aof_masks = data_collection.flag_data(data_collection.test_data, main_args.args.data_name, '10')
 
     print('Total time : {:.2f} min'.format((time.time() - start) / 60))
     print('===============================================')

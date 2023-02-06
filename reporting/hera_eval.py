@@ -43,7 +43,7 @@ class Namespace:
 
 
 args = Namespace(
-    data='LOFAR',
+    data_name='LOFAR',
     data_path='/data/mmesarcik/LOFAR/LOFAR_training_data/datasets/LOFAR_dataset_14-09-2021.pkl',
     seed='',
     input_shape=(128, 64, 1),
@@ -68,7 +68,7 @@ args = Namespace(
 def main(cmd_args):
     df_out = pd.DataFrame(columns=('Model', 'Class', 'Latent_Dim', 'Neighbours', 'Alpha', 'NLN', 'LOF', 'IF', 'OCSVM'))
     indxer = 0
-    df_ = pd.read_csv('outputs/results_{}_{}.csv'.format(cmd_args.data, cmd_args.seed))
+    df_ = pd.read_csv('outputs/results_{}_{}.csv'.format(cmd_args.data_name, cmd_args.seed))
 
     models = list(pd.unique(df_.Model))
 
@@ -175,9 +175,9 @@ def main(cmd_args):
 
                         AUC_IF = roc_auc_score(test_labels != args.anomaly_class, IF)
                         ifs.append(AUC_IF)
-                    nln_norm = process(nln_error, per_image=False)
-                    recon_norm = process(error, per_image=False)
-                    dists_norm = process(dists, per_image=False)
+                    nln_norm = scale(nln_error, scale_per_image=False)
+                    recon_norm = scale(error, scale_per_image=False)
+                    dists_norm = scale(dists, scale_per_image=False)
 
                     error_agg = aggregate(recon_norm, method='max')
                     nln_error_agg = aggregate(nln_norm, method='max')
@@ -205,7 +205,7 @@ def main(cmd_args):
                                      'svm': svms,
                                      'IF': ifs}
                     print(results[clss])
-        filename = 'outputs/{}_{}_{}.csv'.format(args.data, model_type, cmd_args.seed)
+        filename = 'outputs/{}_{}_{}.csv'.format(args.data_name, model_type, cmd_args.seed)
         df_out.to_csv(filename)
 
 
@@ -228,7 +228,7 @@ def aggregate(xs, method='avg'):
 def find_best(models, seed):
     results = {}
     for model_type in models:
-        filename = 'outputs/{}_{}_{}.csv'.format(args.data, model_type, seed)
+        filename = 'outputs/{}_{}_{}.csv'.format(args.data_name, model_type, seed)
         d = np.load(filename, allow_pickle=True)
         # There is no detection column in results_HERA_None.csv
         # So this .csv must be generated differently

@@ -3,44 +3,14 @@ import numpy as np
 from time import time
 import pickle
 from sklearn import metrics, neighbors
-import faiss
+#import faiss
 from inference import infer, get_error
-from utils.data import reconstruct, reconstruct_latent_patches, sizes, process
-from model_config import *
+from utils.data import reconstruct, reconstruct_latent_patches, scale, get_dists, nln
 import itertools
 import warnings
 
 warnings.filterwarnings('ignore')
 
-
-def nln(z, z_query, x_hat_train, algorithm, neighbours, radius=None):
-    """
-        Calculates the nearest neighbours using either frNN or KNN 
-
-        Parameters
-        ----------
-        z (np.array): training set latent space vector
-        z_query (np.array): test set latent space vector
-        x_hat_train (np.array): reconstruction of training data
-        algorithm (str): KNN or frNN
-        neighbours (int): number of neighbours 
-        radius (double): Optional, the frnn radius
-        
-        Returns
-        -------
-        neighbours_dist (np.array) : latent neigbour distance vector 
-        neighbours_idx (np.array): index of neigbours in z 
-        x_hat_train (np.array): reconstruction of training data, adjusted during frNN
-        neighbour_mask (np.array): used for frNN to determine if a sample has neighbours
-
-    """
-    if algorithm == 'knn':
-        index = faiss.IndexFlatL2(z.shape[1])
-        index.add(z.astype(np.float32))
-        neighbours_dist, neighbours_idx = index.search(z_query.astype(np.float32), neighbours)
-        neighbour_mask = np.zeros([len(neighbours_idx)], dtype=bool)
-
-    return neighbours_dist, neighbours_idx, x_hat_train, neighbour_mask
 
 
 def get_nln_errors(model,
@@ -224,10 +194,10 @@ def get_nln_metrics(model,
             else:
                 recon_error, test_labels_ = recon_error, test_labels
 
-            recon_error = process(np.nanmean(recon_error, axis=tuple(range(1, recon_error.ndim))), per_image=False)
+            recon_error = scale(np.nanmean(recon_error, axis=tuple(range(1, recon_error.ndim))), scale_per_image=False)
 
-            error = process(np.nanmean(error, axis=tuple(range(1, error.ndim))), per_image=False)
-            dists = process(get_dists(neighbours_dist, args), per_image=False)
+            error = scale(np.nanmean(error, axis=tuple(range(1, error.ndim))), scale_per_image=False)
+            dists = scale(get_dists(neighbours_dist, args), scale_per_image=False)
 
             if args.anomaly_type == 'MISO':
                 add = metrics.roc_auc_score(test_labels_ == args.anomaly_class, error + dists + recon_error)
@@ -303,33 +273,3 @@ def get_max_score(args):
 
     return max_auc, max_neighbours, max_radius, index_counter, d
 
-
-def get_dists(neighbours_dist, args):
-    """
-        Reconstruct distance vector to original dimensions when using patches
-
-        Parameters
-        ----------
-        neighbours_dist (np.array): Vector of per neighbour distances
-        args (Namespace): cmd_args 
-
-        Returns
-        -------
-        dists (np.array): reconstructed patches if necessary
-
-    """
-
-    dists = np.mean(neighbours_dist, axis=tuple(range(1, neighbours_dist.ndim)))
-
-    if args.patches:
-        n_patches = sizes[str(args.anomaly_class)] // args.patch_x
-        srt, fnnsh = 0, n_patches ** 2
-        dists_recon = []
-        for i in range(0, len(dists), n_patches ** 2):
-            dists_recon.append(np.max(dists[srt:fnnsh]))  ## USING MAX
-            srt = fnnsh
-            fnnsh += n_patches ** 2
-
-        return np.array(dists_recon)
-    else:
-        return dists

@@ -8,8 +8,7 @@ from models import (Encoder,
 from utils.plotting  import  (generate_and_save_images,
                               save_epochs_curve)
 
-from utils.training import print_epoch,save_checkpoint
-from model_config import *
+from utils import print_epoch,save_checkpoint_to_path
 from .helper import end_routine
 
 optimizer = tf.keras.optimizers.Adam(1e-4)
@@ -33,7 +32,7 @@ def train_step(model, x):
 
 def train(ae,train_dataset,test_images,test_labels,args,verbose=True,save=True):
     ae_loss= []
-    dir_path = 'outputs/{}/{}/{}'.format(args.model, args.anomaly_class, args.model_name)
+    dir_path = 'outputs/{}/{}/{}'.format(args.model_class, args.anomaly_class, args.model_name)
 
     for epoch in range(args.epochs):
         start = time.time()
@@ -46,14 +45,14 @@ def train(ae,train_dataset,test_images,test_labels,args,verbose=True,save=True):
                                  'AE_SSIM',
                                  args)
         #save_checkpoint(ae,epoch, args,'AE_SSIM','ae')
-        save_checkpoint(dir_path, ae,'AE_SSIM', epoch)
+        save_checkpoint_to_path(dir_path, ae, 'AE_SSIM', epoch)
 
         ae_loss.append(auto_loss)
 
         #print_epoch('AE_SSIM',epoch,time.time()-start,{'AE Loss':auto_loss.numpy()},None)
         print_epoch('AE_SSIM', epoch, time.time() - start, auto_loss.numpy(), 'loss')
 
-    save_checkpoint(dir_path, ae, 'AE_SSIM')
+    save_checkpoint_to_path(dir_path, ae, 'AE_SSIM')
     save_epochs_curve(dir_path, ae_loss, 'AE_SSIM loss')
     #save_training_metrics_image([ae_loss],
     #                            ['ae loss'],

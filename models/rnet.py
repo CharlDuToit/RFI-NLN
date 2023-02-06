@@ -55,24 +55,24 @@ def RNET_mesarcik(args):
     return model
 
 
-def RNET(args):
+def RNET(input_shape, filters, dropout, kernel_regularizer, final_activation, **kwargs):
     """
     Charl's reimplementation of Mesarcik's RNET
     """
-    input_data = tf.keras.Input(args.input_shape, name='data')
-    xp = layers.Conv2D(filters=args.filters, kernel_size=5, strides=(1, 1), padding='same')(input_data)
+    input_data = tf.keras.Input(input_shape, name='data')
+    xp = layers.Conv2D(filters=filters, kernel_size=5, strides=(1, 1), padding='same')(input_data)
     x3 = GenericBlock('ba cba cbad p',
-                      args.filters,
+                      filters,
                       kernel_size=5,
                       strides=1,
-                      dropout=args.dropout,
-                      kernel_regularizer=args.kernel_regularizer)(xp, skip_tensor=xp)
+                      dropout=dropout,
+                      kernel_regularizer=kernel_regularizer)(xp, skip_tensor=xp)
     x7 = GenericBlock('cba cbad p',
-                      args.filters,
+                      filters,
                       kernel_size=5,
                       strides=1,
-                      dropout=args.dropout,
-                      kernel_regularizer=args.kernel_regularizer)(x3, skip_tensor=x3)
+                      dropout=dropout,
+                      kernel_regularizer=kernel_regularizer)(x3, skip_tensor=x3)
     # Mesarcic had kernel_size 5, Charl changed it back to 1
     # Mesarcic had relu as final activation, charl changed to sigmoid.
     # Paper 14 never mentions any activation function excpet RELU,
@@ -82,12 +82,12 @@ def RNET(args):
     #RELU activation functions to be optimal"
 
     x = GenericBlock('cba',
-                     args.filters,
+                     filters,
                      kernel_size=5,
                      strides=1,
                      activation='relu',
-                     kernel_regularizer=args.kernel_regularizer)(x7)
-    x = GenericBlock('ca', 1, kernel_size=1, strides=1, activation=args.final_activation)(x)
+                     kernel_regularizer=kernel_regularizer)(x7)
+    x = GenericBlock('ca', 1, kernel_size=1, strides=1, activation=final_activation)(x)
 
     model = tf.keras.Model(inputs=[input_data], outputs=[x])
     return model

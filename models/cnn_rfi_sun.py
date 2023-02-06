@@ -40,7 +40,7 @@ def CNN_RFI_SUN_block(input_tensor,
     return x
 
 
-def CNN_RFI_SUN(args, dropout=0.0):
+def CNN_RFI_SUN(dropout=0.0, **kwargs):
     """Tensorflow implementation of
     https://github.com/astronomical-data-processing/CNN_RFI.git."""
     # torch

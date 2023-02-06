@@ -30,7 +30,7 @@ def save_metrics_csv(model_type,
         -------
         nothing
     """
-    if not os.path.exists('outputs/results_{}_{}.csv'.format(args.data,
+    if not os.path.exists('outputs/results_{}_{}.csv'.format(args.data_name,
                                                              args.seed)):
         df = pd.DataFrame(columns=['Model',
                                    'Name',
@@ -82,7 +82,7 @@ def save_metrics_csv(model_type,
                                    'Level_blocks',
                                    'Model_config'])
     else:
-        df = pd.read_csv('outputs/results_{}_{}.csv'.format(args.data,
+        df = pd.read_csv('outputs/results_{}_{}.csv'.format(args.data_name,
                                                             args.seed))
 
     perc = round(((np.sum(test_masks) - np.sum(test_masks_orig)) / np.prod(test_masks_orig.shape)), 3)
@@ -136,7 +136,7 @@ def save_metrics_csv(model_type,
                     'model_config': args.model_config
                     }, ignore_index=True)
 
-    df.to_csv('outputs/results_{}_{}.csv'.format(args.data,
+    df.to_csv('outputs/results_{}_{}.csv'.format(args.data_name,
                                                  args.seed), index=False)
 
 

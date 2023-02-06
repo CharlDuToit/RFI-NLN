@@ -4,12 +4,12 @@ import time
 from models import (Autoencoder,
                     Discriminator)
 
-from utils.plotting  import  (generate_and_save_images,
+from utils import  (generate_and_save_images,
                               save_epochs_curve,
-                              save_training_curves)
+                              )
 
-from utils.training import print_epoch,save_checkpoint
-from model_config import *
+from utils import print_epoch,save_checkpoint_to_path
+from model_config import mse
 
 from .helper import end_routine
 
@@ -65,7 +65,7 @@ def train_step(ae,discriminator, x,):# xn):
 
 def train(ae,discriminator, train_dataset,test_images,test_labels,args):
     ae_loss,d_loss, g_loss= [], [], []
-    dir_path = 'outputs/{}/{}/{}'.format(args.model, args.anomaly_class, args.model_name)
+    dir_path = 'outputs/{}/{}/{}'.format(args.model_class, args.anomaly_class, args.model_name)
 
     for epoch in range(args.epochs):
         start = time.time()
@@ -87,8 +87,8 @@ def train(ae,discriminator, train_dataset,test_images,test_labels,args):
 
         #save_checkpoint(ae,epoch,args,'DAE_disc','ae')
         #save_checkpoint(discriminator, epoch, args,'DAE_disc','disc')
-        save_checkpoint(dir_path, ae, 'AE', epoch)
-        save_checkpoint(dir_path, discriminator, 'DISC', epoch)
+        save_checkpoint_to_path(dir_path, ae, 'AE', epoch)
+        save_checkpoint_to_path(dir_path, discriminator, 'DISC', epoch)
 
         ae_loss.append(auto_loss)
         d_loss.append(disc_loss)
@@ -108,8 +108,8 @@ def train(ae,discriminator, train_dataset,test_images,test_labels,args):
         #              'Generator Loss':gen_loss.numpy()},
         #             None)
 
-    save_checkpoint(dir_path, ae, 'AE')
-    save_checkpoint(dir_path, discriminator, 'DISC')
+    save_checkpoint_to_path(dir_path, ae, 'AE')
+    save_checkpoint_to_path(dir_path, discriminator, 'DISC')
     save_epochs_curve(dir_path, [ae_loss, d_loss, g_loss], ['AE loss', 'DISC loss', 'GEN loss'])
 
    # save_training_metrics_image([ae_loss, d_loss, g_loss],
@@ -122,7 +122,7 @@ def train(ae,discriminator, train_dataset,test_images,test_labels,args):
 
 def main(train_dataset,train_images, train_labels, test_images, test_labels, test_masks, test_masks_orig,args):
 
-    if args.data == 'MVTEC':
+    if args.data_name == 'MVTEC':
         ae = Autoencoder_MVTEC(args)
         discriminator = Discriminator_x_MVTEC(args)
     else:

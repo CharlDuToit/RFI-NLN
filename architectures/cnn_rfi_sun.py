@@ -5,11 +5,11 @@ from matplotlib import pyplot as plt
 import time
 from models import CNN_RFI_SUN
 
-from utils.plotting import (generate_and_save_images,
+from utils import (generate_and_save_images,
                             save_epochs_curve)
 
-from utils.training import print_epoch, save_checkpoint
-from model_config import *
+from utils import print_epoch, save_checkpoint_to_path
+from model_config import BUFFER_SIZE, BATCH_SIZE, bce
 from .helper import end_routine
 from inference import infer
 
@@ -53,7 +53,7 @@ def train(cnn_rfi_sun, train_dataset, train_images, train_masks, test_images, te
         #                         'CNN_RFI_SUN',
         #                         args)
         #save_checkpoint(cnn_rfi_sun, epoch, args, 'CNN_RFI_SUN', 'cnn_rfi_sun')
-        save_checkpoint(dir_path, cnn_rfi_sun, 'CNN_RFI_SUN', epoch)
+        save_checkpoint_to_path(dir_path, cnn_rfi_sun, 'CNN_RFI_SUN', epoch)
 
 
         cnn_rfi_sun_loss.append(auto_loss)  # auto_loss for the last batch
@@ -64,7 +64,7 @@ def train(cnn_rfi_sun, train_dataset, train_images, train_masks, test_images, te
     #save_training_metrics_image([cnn_rfi_sun_loss],
     #                            ['cnn_rfi_sun loss'],
     #                           'CNN_RFI_SUN', args)
-    save_checkpoint(dir_path, cnn_rfi_sun, 'CNN_RFI_SUN')
+    save_checkpoint_to_path(dir_path, cnn_rfi_sun, 'CNN_RFI_SUN')
 
     save_epochs_curve(dir_path, cnn_rfi_sun_loss, 'CNN_RFI_SUN loss')
 

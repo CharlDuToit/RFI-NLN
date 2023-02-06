@@ -1,4 +1,4 @@
-def print_epoch(model_type, epoch, time, metrics, metric_labels):
+def print_epoch(model_class, epoch, time, metrics, metric_labels, **kwargs):
     """
         Messages to print while training
 
@@ -18,7 +18,7 @@ def print_epoch(model_type, epoch, time, metrics, metric_labels):
             metrics.remove(epochs_metric)
             metric_labels.remove(label)
     print('__________________')
-    print('{} at epoch {}, time {:.2f} sec'.format(model_type, epoch, time))
+    print('{} at epoch {}, time {:.2f} sec'.format(model_class, epoch, time))
     for mtrc, label in zip(metrics, metric_labels):
         print(f'{label}: {mtrc}')
 

@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from utils.data import get_patches, reconstruct
+from utils import get_patches, reconstruct
 import os
 from scipy.io import loadmat
 

@@ -1,5 +1,5 @@
 from .ae_arch import AEArchitecture
-from utils.training import save_checkpoint
+from utils.training import save_checkpoint_to_path
 from data_collection import DataCollection
 import time
 import random
@@ -67,8 +67,6 @@ class DAEArchitecture(AEArchitecture):
         return auto_loss, disc_loss, gen_loss
 
     def train(self, data_collection: DataCollection):
-        if not data_collection.all_not_none(['normal_train_data']):
-            raise ValueError('data_collection is missing normal_train_data')
 
         normal_train_data_dataset = tf.data.Dataset.from_tensor_slices(
             data_collection.normal_train_data).shuffle(self.buffer_size, seed=42).batch(self.batch_size)
@@ -118,9 +116,9 @@ class DAEArchitecture(AEArchitecture):
 
     def save_checkpoint(self, epoch=-1, model_subtype=None, losses=None):
         if model_subtype == 'AE':
-            save_checkpoint(self.dir_path, self.model, model_subtype, epoch)
+            save_checkpoint_to_path(self.dir_path, self.model, model_subtype, epoch)
         if model_subtype == 'DISC':
-            save_checkpoint(self.dir_path, self.discriminator, model_subtype, epoch)
+            save_checkpoint_to_path(self.dir_path, self.discriminator, model_subtype, epoch)
 
     def load_checkpoint(self):
         path = f'{self.dir_path}/training_checkpoints/checkpoint_full_model_AE'

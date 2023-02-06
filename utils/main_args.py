@@ -22,7 +22,7 @@ def str2bool(v):
 
 parser = argparse.ArgumentParser(description='Train generative anomaly detection models')
 
-parser.add_argument('-model', metavar='-m', type=str, default='AE',
+parser.add_argument('-model_class', metavar='-m', type=str, default='AE',
                     choices={'AC_UNET', 'UNET', 'AE', 'DAE', 'DKNN', 'RNET', 'CNN_RFI_SUN', 'RFI_NET', 'AE-SSIM', 'DSC_DUAL_RESUNET', 'DSC_MONO_RESUNET', 'ASPP_UNET'},
                     help='Which model to train and evaluate')
 parser.add_argument('-task', metavar='-t', type=str, default='train',
@@ -52,7 +52,7 @@ parser.add_argument('-radius', metavar='-r', type=float, nargs='+', default=[0.1
                     help='The radius of the unit circle for finding neighbours in frNN')
 parser.add_argument('-algorithm', metavar='-nn', type=str, choices={"frnn", "knn"},
                     default='knn', help='The algorithm for calculating neighbours')
-parser.add_argument('-data', metavar='-d', type=str, default='HERA',
+parser.add_argument('-data_name', metavar='-d', type=str, default='HERA',
                     #choices={'HERA', 'HERA_PHASE', 'LOFAR', 'MNIST', 'CIFAR10', 'FASHION_MNIST', 'ASTRON_0'},
                     help='The dataset for training and testing the model on')
 parser.add_argument('-data_path', metavar='-mp', type=str, default='./data',
@@ -61,6 +61,8 @@ parser.add_argument('-seed', metavar='-s', type=str,
                     help='The random seed used for naming output files')
 parser.add_argument('-debug', metavar='-de', type=str, default='0',
                     choices={'0', '1', '2', '3'}, help='TF debug level')
+parser.add_argument('-log', metavar='-log', type=str2bool, default=True,
+                    help='Take log of data?')
 parser.add_argument('-rotate', metavar='-rot', type=str2bool, default=False,
                     help='Train on rotated augmentations?')
 # CROP IS NEVER ACTUALLY USED
@@ -81,14 +83,25 @@ parser.add_argument('-patch_stride_x', metavar='-psx', type=int,
                     help='x-dimension of strides of patches')
 parser.add_argument('-patch_stride_y', metavar='-psy', type=int,
                     help='y-dimension of strides of patches')
+parser.add_argument('-flag_test_data', metavar='-ftd', type=str2bool, default=False,
+                    help='Flag test data if rfi_threshold is given?')
 parser.add_argument('-rfi', metavar='-rfi', type=str, default=None,
                     help='HERA RFI label to exclude from training')
 parser.add_argument('-rfi_threshold', metavar='-rfi_threshold', type=str, default=None,
                     help='AOFlagger base threshold')
 parser.add_argument('-lofar_subset', metavar='-lofar_subset', type=str, default='full',
                     choices={'L629174', 'L631961', 'full'}, help='LOFAR subset to use for training')
-parser.add_argument('-clip', metavar='-clip', type=float, default=None,
-                    help='AOFlagger base threshold')
+parser.add_argument('-scale_per_image', metavar='-spi', type=str2bool, default=True,
+                    help='Normalize per image or for entire dataset')
+parser.add_argument('-clip_per_image', metavar='-cpi', type=str2bool, default=True,
+                    help='Clip per image or for entire dataset')
+parser.add_argument('-clipper', metavar='-clip', type=str, default='None',
+                    choices={'None', 'std', 'dyn_std', 'known'},
+                    help='Clip strategy to use')
+parser.add_argument('-std_max', metavar='-sp', type=float, default=4,
+                    help='Number of stds from mean to max clip')
+parser.add_argument('-std_min', metavar='-sp', type=float, default=-1,
+                    help='Number of stds from mean to min clip')
 parser.add_argument('-filters', metavar='-nf', type=int, default=16,
                     help='base number of filters')
 parser.add_argument('-height', metavar='-h', type=int, default=3,
@@ -103,7 +116,7 @@ parser.add_argument('-dropout', metavar='-drop', type=float, default=0.0,
 parser.add_argument('-batch_size', metavar='-bas', type=int, default=64,
                     help='Batch size')
 parser.add_argument('-buffer_size', metavar='-bus', type=int, default=2**10,
-                    help='Buffer size')
+                    help='Buffer size for shuffling')
 parser.add_argument('-optimal_alpha', metavar='-oalpha', type=str2bool, default=True,
                     help='Replace args.alphas with list of one alpha which is optimized for args.data for AE')
 parser.add_argument('-optimal_neighbours', metavar='-oneighs', type=str2bool, default=True,
@@ -128,7 +141,7 @@ parser.add_argument('-images_per_epoch', metavar='-ipe', type=int, default=1,
                     help='How many images to save per epoch')
 parser.add_argument('-early_stop', metavar='-es', type=int, default=20,
                     help='Early stopping for validation loss')
-parser.add_argument('-split_seed', metavar='-ss', type=str, default='None',
+parser.add_argument('-shuffle_seed', metavar='-ss', type=str, default='None',
                     help='Seed to split data into training and validation. Default is random')
 parser.add_argument('-val_split', metavar='-vs', type=float, default=0.2,
                     help='Validation split')
@@ -138,6 +151,8 @@ parser.add_argument('-output_path', metavar='-op', type=str, default='./outputs'
                     help='Path where models are saved')
 parser.add_argument('-save_dataset', metavar='-sd', type=str2bool, default=False,
                     help='Save entire inferred dataset')
+parser.add_argument('-shuffle_patches', metavar='-sp', type=str2bool, default=False,
+                    help='Shuffle the patches? ')
 
 args = parser.parse_args()
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = args.debug
@@ -195,7 +210,7 @@ in main.py args is populated with these shapes from a DataCollection instance
 args.input_shape = None
 args.raw_input_shape = None
 
-if args.model not in ['AC_UNET', 'ASPP_UNET']:
+if args.model_class not in ['AC_UNET', 'ASPP_UNET']:
     args.dilation_rate = 1
 
 if args.model_name != 'None' and args.parent_model_name != 'None':
@@ -214,10 +229,10 @@ if args.model_name == 'None':
 if args.parent_model_name == 'None':
     args.parent_model_name = None
 
-if args.split_seed == 'None':
-    args.split_seed = None
+if args.shuffle_seed == 'None':
+    args.shuffle_seed = None
 else:
-    args.split_seed = int(args.split_seed)
+    args.shuffle_seed = int(args.shuffle_seed)
 
 if args.limit == 'None':
     args.limit = None
@@ -230,9 +245,12 @@ if args.rfi_threshold == 'None':
 if args.kernel_regularizer == 'None':
     args.kernel_regularizer = None
 
-if ((args.data == 'MNIST') or
-        (args.data == 'CIFAR10') or
-        (args.data == 'FASHION_MNIST')):
+if args.clipper == 'None':
+    args.clipper = None
+
+if ((args.data_name == 'MNIST') or
+        (args.data_name == 'CIFAR10') or
+        (args.data_name == 'FASHION_MNIST')):
     args.anomaly_class = int(args.anomaly_class)
 
 #args = resolve_model_config_args(args)

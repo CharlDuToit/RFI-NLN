@@ -10,10 +10,10 @@ import numpy as np
 #                              roc_auc_score,
 #                              precision_recall_curve)
 from inference import infer, get_error
-from utils.data import *
+from utils.data import get_dists_recon, reconstruct_latent_patches, reconstruct
 #from  utils.data import get_patches, reconstruct, reconstruct_latent_patches
 from .nln_metrics import nln, get_nln_errors
-from .segmentation_metrics import get_metrics, get_dists
+from .segmentation_metrics import get_metrics
 from matplotlib import pyplot as plt
 
 
@@ -105,11 +105,11 @@ def evaluate_performance(model,
 
     # Get output from model #TODO: do we want to normalise?
     # test_data_recon = patches.reconstruct(test_images, args)
-    test_data_recon = patches.reconstruct(test_images, args.raw_input_shape, args.patch_x, args.patch_y)
+    test_data_recon = reconstruct(test_images, args.raw_input_shape, args.patch_x, args.patch_y)
     # test_masks_recon = patches.reconstruct(test_masks, args)
-    test_masks_recon = patches.reconstruct(test_masks, args.raw_input_shape, args.patch_x, args.patch_y)
+    test_masks_recon = reconstruct(test_masks, args.raw_input_shape, args.patch_x, args.patch_y)
     # test_masks_orig_recon = patches.reconstruct(test_masks_orig, args)
-    test_masks_orig_recon = patches.reconstruct(test_masks_orig, args.raw_input_shape, args.patch_x, args.patch_y)
+    test_masks_orig_recon = reconstruct(test_masks_orig, args.raw_input_shape, args.patch_x, args.patch_y)
 
     if model_type == 'UNET' or model_type == 'RNET' or model_type == 'RFI_NET':
         # count flops and time
@@ -117,7 +117,7 @@ def evaluate_performance(model,
         start = time.time()
         x_hat = infer(model[0], test_images, args, 'AE')
         # x_hat_recon = patches.reconstruct(x_hat, args)
-        x_hat_recon = patches.reconstruct(x_hat, args.raw_input_shape, args.patch_x, args.patch_y)
+        x_hat_recon = reconstruct(x_hat, args.raw_input_shape, args.patch_x, args.patch_y)
         x_hat_recon[x_hat_recon == np.inf] = np.finfo(x_hat_recon.dtype).max
         tot_time += (time.time() - start) / test_images.shape[0]
 
@@ -168,7 +168,7 @@ def evaluate_performance(model,
         # count flops and time
         flops += 0  # TODO
         # dists_recon = get_dists(neighbours_dist, args)
-        dists_recon = get_dists(neighbours_dist, args.raw_input_shape, args.patch_x, args.patch_y)
+        dists_recon = get_dists_recon(neighbours_dist, args.raw_input_shape, args.patch_x, args.patch_y)
         tot_time += (time.time() - start) / test_images.shape[0]
 
         (dknn_ao_auroc, dknn_true_auroc,
@@ -216,14 +216,14 @@ def evaluate_performance(model,
     start = time.time()
     x_hat = infer(model[0], test_images, args, 'AE')
     # x_hat_recon = patches.reconstruct(x_hat, args)
-    x_hat_recon = patches.reconstruct(x_hat, args.raw_input_shape, args.patch_x, args.patch_y)
+    x_hat_recon = reconstruct(x_hat, args.raw_input_shape, args.patch_x, args.patch_y)
 
     tot_time += (time.time() - start) / test_images.shape[0]
 
     error = get_error('AE', test_images, x_hat, mean=False)
 
     # error_recon, labels_recon = patches.reconstruct(error, args, test_labels)
-    error_recon, labels_recon = patches.reconstruct(error, args.raw_input_shape, args.patch_x, args.patch_y,
+    error_recon, labels_recon = reconstruct(error, args.raw_input_shape, args.patch_x, args.patch_y,
                                                     args.anomaly_class, test_labels)
 
     (ae_ao_auroc, ae_true_auroc,
@@ -260,7 +260,7 @@ def evaluate_performance(model,
     if args.patches:
         if nln_error.ndim == 4:
             # nln_error_recon = patches.reconstruct(nln_error, args)
-            nln_error_recon = patches.reconstruct(nln_error, args.raw_input_shape, args.patch_x, args.patch_y)
+            nln_error_recon = reconstruct(nln_error, args.raw_input_shape, args.patch_x, args.patch_y)
         else:
             # nln_error_recon = patches.reconstruct_latent_patches(nln_error, args)
             nln_error_recon = reconstruct_latent_patches(nln_error, args.raw_input_shape, args.patch_x, args.patch_y)
@@ -269,7 +269,7 @@ def evaluate_performance(model,
 
     # count FLOPS and time
     # dists_recon = get_dists(neighbours_dist, args)
-    dists_recon = get_dists(neighbours_dist, args.raw_input_shape, args.patch_x, args.patch_y)
+    dists_recon = get_dists_recon(neighbours_dist, args.raw_input_shape, args.patch_x, args.patch_y)
     # tot_time += (time.time() - start) / test_images.shape[0]
 
     (nln_ao_auroc, nln_true_auroc,
@@ -289,10 +289,10 @@ def evaluate_performance(model,
     for alpha in args.alphas:
         # Count FLOPS and time
         flops += 0
-        if args.data == 'LOFAR':
+        if args.data_name == 'LOFAR':
             combined_recon = np.clip(nln_error_recon, nln_error_recon.mean() + nln_error_recon.std() * 5,
                                      1.0) * np.array([d > np.percentile(d, 66) for d in dists_recon])  #
-        elif args.data == 'HERA':
+        elif args.data_name == 'HERA':
             combined_recon = nln_error_recon * np.array([d > np.percentile(d, 10) for d in dists_recon])  #
 
         tot_time += (time.time() - start) / test_images.shape[0]  # NB THIS LOOP SHOULD RUN ONLY ONCE

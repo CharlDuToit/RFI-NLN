@@ -1,7 +1,8 @@
-from utils.flagging import flag_data
-from utils.metrics import get_dists
-from utils.data.processor import process
-from utils.data.patches import get_patches, reconstruct, reconstruct_latent_patches
+from utils import flag_data
+from utils import get_dists
+from utils import scale
+from utils import get_patches, reconstruct, reconstruct_latent_patches
+from utils import get_lofar_data, get_hera_data, get_astron_data
 
 #import copy
 import numpy as np
@@ -17,23 +18,25 @@ class DataCollection:
 
     def __init__(self,
                  args,
-                 std_minus=0.0,
-                 std_plus=0.0,
-                 combine_min_std_plus=None,
+                 std_min=0.0,
+                 std_max=0.0,
+                 combine_std_min=None,
                  flag_test_data=False,
                  generate_normal_data=False,
+                 clipper='std',
                  clip_per_image=True,
                  scale_per_image=True,
                  log=True,
-                 hyp_split=0.2):
+                 hyp_split=0.2,
+                 **kwargs):
 
         self.generate_normal_data = generate_normal_data
         self.hyp_split = hyp_split
 
-        self.combine_min_std_plus = combine_min_std_plus
-        self.std_minus = std_minus
-        self.std_plus = std_plus
-        if std_minus == 0.0 and std_plus == 0.0:
+        self.combine_std_min = combine_std_min
+        self.std_min = std_min
+        self.std_max = std_max
+        if std_min == 0.0 and std_max == 0.0:
             self.clip_per_image = False
         else:
             self.clip_per_image = clip_per_image
@@ -59,7 +62,7 @@ class DataCollection:
         self.patch_stride_x = args.patch_stride_x
         self.anomaly_class = args.anomaly_class
         self.anomaly_type = args.anomaly_type
-        self.data_name = args.data  # SHOULD ONLY BE USED IN load_raw_data(), to_dict() and flag_data()
+        self.data_name = args.data_name  # SHOULD ONLY BE USED IN load_raw_data(), to_dict() and flag_data()
         self.rfi = args.rfi  # hera rfi to exclude
         self.data_path = args.data_path
         self.lofar_subset = args.lofar_subset
@@ -92,79 +95,15 @@ class DataCollection:
     def load_raw_data(self):
         """populates raw train data and masks and raw test data and masks"""
 
-        # ======================================================
-        if self.data_name in ['ant_fft_000_094_t4032_f4096',
-                         'ant_fft_000_094_t4096_f4096',
-                         'ant_fft_000_094_t8128_f8192',
-                         'ant_fft_000_094_t12160_f16384']:
-            file = os.path.join(self.data_path, f'{self.data_name}.mat')
-            self.raw_train_data = np.expand_dims(loadmat(file)['sbdata'], (0, -1))/1e3
-            #self.raw_train_data = np.expand_dims(loadmat(file)['sbdata'][0:512, 0:512], (0, -1))/1e3
-            #print(self.raw_train_data.shape)
-            self.raw_train_masks = None
-            self.raw_test_data = None
-            self.raw_test_masks = None
-        # ======================================================
-        if self.data_name == 'ASTRON_0':
-            file = os.path.join(self.data_path, 'dyn_spectra_000_094.mat')
-            data = loadmat(file)
-            # ac000, ac094, vis000_094
-            self.raw_train_data = np.empty((3,100,300,1), dtype='float32')
-            self.raw_train_data[0, ...] = np.expand_dims(data['ac000'].astype('float32'),  -1)
-            self.raw_train_data[1, ...] = np.expand_dims(data['ac094'].astype('float32'),  -1)
-            self.raw_train_data[2, ...] = np.abs(np.expand_dims(data['vis000_094'].astype('float32'),  -1))
-            self.raw_train_masks = None
-            self.raw_test_data = None
-            self.raw_test_masks = None
-
-        # ======================================================
+        if self.data_name == 'ASTRON':
+            self.raw_train_data, self.raw_train_masks, self.raw_test_data, self.raw_test_masks = get_astron_data(
+                self.data_path)
         if self.data_name == 'LOFAR':
-            full_file = file = 'LOFAR_Full_RFI_dataset.pkl'
-            if self.lofar_subset is None or self.lofar_subset == 'full':
-                file = full_file
-            if self.lofar_subset == 'L629174':
-                file = 'L629174_RFI_dataset.pkl'
-            if self.lofar_subset == 'L631961':
-                file = 'L631961_RFI_dataset.pkl'
-
-            if os.path.exists(os.path.join(self.data_path, file)):
-                print(os.path.join(self.data_path, file) + ' Loading')
-                with open('{}/{}'.format(self.data_path, file), 'rb') as f:
-                    (self.raw_train_data, self.raw_train_masks, self.raw_test_data, self.raw_test_masks) = pickle.load(
-                        f)
-                    #self.raw_input_shape = self.raw_train_data.shape[1:]
-            else:
-                raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT),
-                                        os.path.join(self.data_path, file))
-        # ======================================================
-        if self.data_name in ['HERA', 'HERA_PHASE']:
-            if self.data_name == 'HERA':
-                date = '04-03-2022'
-            elif self.data_name == 'HERA_PHASE':
-                date = '07-11-2022'
-
-            if self.rfi is not None:
-                rfi_models = ['rfi_stations', 'rfi_dtv', 'rfi_impulse', 'rfi_scatter']
-                (_, _, test_data,
-                 test_masks) = np.load('{}/HERA_{}_{}.pkl'.format(self.data_path, date, self.rfi), allow_pickle=True)
-
-                rfi_models.remove(self.rfi)
-
-                (train_data,
-                 train_masks, _, _) = np.load('{}/HERA_{}_{}.pkl'.format(self.data_path, date, '-'.join(rfi_models)),
-                                              allow_pickle=True)
-
-            else:
-                (train_data, train_masks,
-                 test_data, test_masks) = np.load('{}/HERA_{}_all.pkl'.format(self.data_path, date),
-                                                  allow_pickle=True)
-            train_data[train_data == np.inf] = np.finfo(train_data.dtype).max
-            test_data[test_data == np.inf] = np.finfo(test_data.dtype).max
-
-            self.raw_train_data = train_data.astype('float32')
-            self.raw_test_data = test_data.astype('float32')
-            self.raw_train_masks = train_masks
-            self.raw_test_masks = test_masks
+            self.raw_train_data, self.raw_train_masks, self.raw_test_data, self.raw_test_masks = get_lofar_data(
+                self.data_path, self.lofar_subset)
+        if self.data_name == 'HERA':
+            self.raw_train_data, self.raw_train_masks, self.raw_test_data, self.raw_test_masks = get_hera_data(
+                self.data_path, self.rfi)
 
         # ======================================================
         self.raw_input_shape = self.raw_train_data.shape[1:]
@@ -317,11 +256,11 @@ class DataCollection:
         # alpha between 0.0 and 1.0
         # LOFAR optimal alpha = 0.66
         # HERA optimal alpha = 0.10
-        if self.combine_min_std_plus is None:
+        if self.combine_std_min is None:
             combined_recon = nln_error * np.array([d > np.percentile(d, alpha * 100) for d in dists])
         else:
             nln_error_clipped = np.clip(nln_error,
-                                        nln_error.mean() + nln_error.std() * np.abs(self.combine_min_std_plus),
+                                        nln_error.mean() + nln_error.std() * self.combine_std_min,
                                         1.0)
             combined_recon = nln_error_clipped * np.array([d > np.percentile(d, alpha * 100) for d in dists])
         combined_recon = np.nan_to_num(combined_recon)
@@ -333,12 +272,13 @@ class DataCollection:
     def rescale(self, data):
         if data is None:
             return None
-        return process(data, per_image=self.scale_per_image)
+        return scale(data, scale_per_image=self.scale_per_image)
 
     def get_normal_data(self, data, masks):
         if data is None or masks is None:
             return None
-        normal_data = data[np.invert(np.any(masks, axis=(1, 2, 3)))]
+        axis = data.shape[1:]
+        normal_data = data[np.invert(np.any(masks, axis=axis))]
         labels = ['normal'] * len(normal_data)
         return normal_data, labels
 
@@ -378,9 +318,9 @@ class DataCollection:
             return self.get_clipped_data(data)
         # mean and std of nonrfi
         #_max = np.mean(data[np.invert(masks)]) + np.abs(self.std_plus) * np.std(data[np.invert(masks)])
-        _max = np.mean(data[np.invert(masks)]) + self.std_plus * np.std(data[np.invert(masks)])
+        _max = np.mean(data[np.invert(masks)]) + self.std_max * np.std(data[np.invert(masks)])
         #_min = np.absolute(np.mean(data[np.invert(masks)]) - np.abs(self.std_minus) * np.std(data[np.invert(masks)]))
-        _min = np.mean(data[np.invert(masks)]) - np.abs(self.std_minus) * np.std(data[np.invert(masks)])
+        _min = np.mean(data[np.invert(masks)]) - np.abs(self.std_min) * np.std(data[np.invert(masks)])
         return np.clip(data, _min, _max)
 
     def get_clipped_data(self, data):
@@ -389,16 +329,16 @@ class DataCollection:
         std = np.std(data)
         mean = np.mean(data)
         #_max = mean + np.abs(self.std_plus) * std
-        _max = mean + self.std_plus * std
+        _max = mean + self.std_max * std
         #_min = np.absolute(mean - np.abs(self.std_minus) * std)
-        _min = mean - np.abs(self.std_minus) * std
+        _min = mean - np.abs(self.std_min) * std
         return np.clip(data, _min, _max)
 
     def flag_data(self, data):
         if data is None:
             return None
         train_masks = flag_data(data, self.data_name, self.rfi_threshold)
-        return np.expand_dims(train_masks, axis=-1)
+        return train_masks
 
     def get_patches(self, data_or_masks):
         if data_or_masks is None:
@@ -485,54 +425,14 @@ class DataCollection:
 
         return train_data_dataset, val_data_dataset, train_mask_dataset, val_mask_dataset, num_train, num_val, seed
 
-    def all_not_none(self, properties):
-        for prop in properties:
-            if prop == 'train_data' and self.train_data is None:
-                return False
-            if prop == 'test_data' and self.test_data is None:
-                return False
-            if prop == 'train_masks' and self.train_masks is None:
-                return False
-            if prop == 'test_masks' and self.test_masks is None:
-                return False
-            if prop == 'train_labels' and self.train_labels is None:
-                return False
-            if prop == 'test_labels' and self.test_labels is None:
-                return False
-            if prop == 'normal_train_data' and self.normal_train_data is None:
-                return False
-            if prop == 'normal_train_labels' and self.normal_train_labels is None:
-                return False
-            # if prop == 'test_masks_orig' and self.test_masks_orig is None:
-            #    return False
-            if prop == 'raw_train_data' and self.raw_train_data is None:
-                return False
-            if prop == 'raw_train_masks' and self.raw_train_masks is None:
-                return False
-            if prop == 'raw_test_masks' and self.raw_test_masks is None:
-                return False
-            if prop == 'raw_test_data' and self.raw_test_data is None:
-                return False
-            if prop == 'hyp_data' and self.hyp_data is None:
-                return False
-            if prop == 'hyp_masks' and self.hyp_masks is None:
-                return False
-            if prop == 'hyp_labels' and self.hyp_labels is None:
-                return False
-            if prop == 'normal_hyp_data' and self.normal_hyp_data is None:
-                return False
-            if prop == 'normal_hyp_labels' and self.normal_hyp_labels is None:
-                return False
-        return True
-
     def to_dict(self):
         return {
             'raw_input_shape': self.raw_input_shape,
             'input_shape': self.input_shape,
             'num_patches': self.patches_per_image(),
             'limit': self.limit,
-            'std_plus': self.std_plus,
-            'std_minus': self.std_minus,
+            'std_plus': self.std_max,
+            'std_minus': self.std_min,
             'scale_per_image': self.scale_per_image,
             'clip_per_image': self.clip_per_image,
             'patch_x': self.patch_x,
@@ -543,5 +443,5 @@ class DataCollection:
             'rfi_threshold': self.rfi_threshold,
             'ood_rfi': self.rfi,
             'lofar_subset': self.lofar_subset,
-            'combine_min_std_plus': self.combine_min_std_plus,
+            'combine_min_std_plus': self.combine_std_min,
         }

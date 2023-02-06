@@ -7,15 +7,15 @@ tf.keras.backend.set_floatx('float32')
 
 
 class Encoder(tf.keras.layers.Layer):
-    def __init__(self, args):
+    def __init__(self, input_shape, height, filters, latent_dim, dropout, **kwargs):
         super(Encoder, self).__init__()
-        self.input_layer = layers.InputLayer(input_shape=args.input_shape)
+        self.input_layer = layers.InputLayer(input_shape=input_shape)
         self.conv, self.pool, self.batchnorm, self.dropout = [], [], [], []
-        self.latent_dim = args.latent_dim
-        self.height = args.height
+        self.latent_dim = latent_dim
+        self.height = height
 
-        for n in range(args.height):
-            self.conv.append(layers.Conv2D(filters=(args.height - n) * args.filters,
+        for n in range(height):
+            self.conv.append(layers.Conv2D(filters=(height - n) * filters,
                                            kernel_size=(3, 3),
                                            strides=(2, 2),
                                            padding='same',
@@ -23,14 +23,14 @@ class Encoder(tf.keras.layers.Layer):
             # self.pool.append(layers.MaxPooling2D(pool_size=(2,2),padding='same'))
 
             self.batchnorm.append(layers.BatchNormalization())
-            self.dropout.append(layers.Dropout(0.05))
+            self.dropout.append(layers.Dropout(dropout)) # 0.05
 
         # output shape = 2,2
         self.flatten = layers.Flatten()
         self.dense_ae = layers.Dense(self.latent_dim, activation=None)
         #self.shape = (None, self.latent_dim)
 
-        self.dense_vae = layers.Dense(args.filters, activation='relu')
+        self.dense_vae = layers.Dense(filters, activation='relu')
         self.mean = layers.Dense(self.latent_dim)
         self.logvar = layers.Dense(self.latent_dim)
 
@@ -57,21 +57,21 @@ class Encoder(tf.keras.layers.Layer):
 
 
 class Decoder(tf.keras.layers.Layer):
-    def __init__(self, args):
+    def __init__(self, input_shape, height, filters, latent_dim, dropout, **kwargs):
         super(Decoder, self).__init__()
-        self.latent_dim = args.latent_dim
-        self.height = args.height
+        self.latent_dim = latent_dim
+        self.height = height
         self.input_layer = layers.InputLayer(input_shape=[self.latent_dim, ])
-        self.dense = layers.Dense(args.input_shape[0] // 2 ** (self.height - 1) *
-                                  args.input_shape[1] // 2 ** (self.height - 1) *
-                                  args.filters, activation='relu')
-        self.reshape = layers.Reshape((args.input_shape[0] // 2 ** (self.height - 1),
-                                       args.input_shape[1] // 2 ** (self.height - 1),
-                                       args.filters))
+        self.dense = layers.Dense(input_shape[0] // 2 ** (self.height - 1) *
+                                  input_shape[1] // 2 ** (self.height - 1) *
+                                  filters, activation='relu')
+        self.reshape = layers.Reshape((input_shape[0] // 2 ** (self.height - 1),
+                                       input_shape[1] // 2 ** (self.height - 1),
+                                       filters))
 
         self.conv, self.pool, self.batchnorm, self.dropout = [], [], [], []
         for n in range(self.height - 1):
-            self.conv.append(layers.Conv2DTranspose(filters=(n + 1) * args.filters,
+            self.conv.append(layers.Conv2DTranspose(filters=(n + 1) * filters,
                                                     kernel_size=(3, 3),
                                                     strides=(2, 2),
                                                     padding='same',
@@ -79,9 +79,9 @@ class Decoder(tf.keras.layers.Layer):
 
             self.pool.append(layers.UpSampling2D(size=(2, 2)))
             self.batchnorm.append(layers.BatchNormalization())
-            self.dropout.append(layers.Dropout(0.05))
+            self.dropout.append(layers.Dropout(dropout)) # 0.05
 
-        self.conv_output = layers.Conv2DTranspose(filters=args.input_shape[-1],
+        self.conv_output = layers.Conv2DTranspose(filters=input_shape[-1],
                                                   kernel_size=(3, 3),
                                                   padding='same',
                                                   activation='sigmoid')
@@ -102,10 +102,10 @@ class Decoder(tf.keras.layers.Layer):
 
 
 class Autoencoder(tf.keras.Model):
-    def __init__(self, args):
+    def __init__(self,  input_shape, height, filters, latent_dim, dropout, **kwargs):
         super(Autoencoder, self).__init__()
-        self.encoder = Encoder(args)
-        self.decoder = Decoder(args)
+        self.encoder = Encoder( input_shape, height, filters, latent_dim, dropout, **kwargs)
+        self.decoder = Decoder( input_shape, height, filters, latent_dim, dropout, **kwargs)
     #def __call__(self, x):
     def call(self, x):
         z = self.encoder(x, vae=False)
@@ -114,9 +114,9 @@ class Autoencoder(tf.keras.Model):
 
 
 class Discriminator(tf.keras.Model):
-    def __init__(self, args):
+    def __init__(self,  input_shape, height, filters, latent_dim, dropout, **kwargs):
         super(Discriminator, self).__init__()
-        self.network = Encoder(args)
+        self.network = Encoder(input_shape, height, filters, latent_dim, dropout, **kwargs)
         self.flatten = layers.Flatten()
         self.dense = layers.Dense(1, activation='sigmoid')
 

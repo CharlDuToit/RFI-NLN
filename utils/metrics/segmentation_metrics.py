@@ -4,12 +4,26 @@ import numpy as np
 from sklearn.metrics import (roc_curve,
                              auc,
                              f1_score,
+                             recall_score,
+                             precision_score,
                              accuracy_score,
                              average_precision_score,
                              jaccard_score,
                              roc_auc_score,
                              precision_recall_curve)
 from utils.data import *
+
+
+def recall(y_true, y_pred, threshold=0.5):
+    return recall_score(y_true.flatten(), y_pred.flatten() > threshold)
+
+
+def accuracy(y_true, y_pred, threshold=0.5):
+    return accuracy_score(y_true.flatten(), y_pred.flatten() > threshold)
+
+
+def precision(y_true, y_pred, threshold=0.5):
+    return precision_score(y_true.flatten(), y_pred.flatten() > threshold)
 
 
 def f1(y_true, y_pred, threshold=0.5):
@@ -52,29 +66,3 @@ def get_metrics(test_masks_recon, test_masks_orig_recon, error_recon):
 
     return -1, true_auroc, -1, true_auprc, -1, true_f1
 
-
-def get_dists(neighbours_dist, raw_input_shape, patch_x, patch_y):
-    """
-        Reconstruct distance vector to original dimensions when using patches
-
-        Parameters
-        ----------
-        neighbours_dist (np.array): Vector of per neighbour distances
-        args (Namespace): cmd_args 
-
-        Returns
-        -------
-        dists (np.array): reconstructed patches if necessary
-
-    """
-    patches = raw_input_shape[0] > patch_x or raw_input_shape[1] > patch_y
-    dists = np.mean(neighbours_dist, axis=tuple(range(1, neighbours_dist.ndim)))
-    if patches:
-        #dists = np.array([[d] * args.patch_x ** 2 for i, d in enumerate(dists)]).reshape(len(dists), args.patch_x, args.patch_y)
-        dists = np.array([[d] * patch_x * patch_y for i, d in enumerate(dists)]).reshape(len(dists), patch_x, patch_y)
-
-        # dists_recon = reconstruct(np.expand_dims(dists, axis=-1), args)
-        dists_recon = reconstruct(np.expand_dims(dists, axis=-1), raw_input_shape, patch_x, patch_y)
-        return dists_recon
-    else:
-        return dists

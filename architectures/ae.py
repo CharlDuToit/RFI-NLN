@@ -5,11 +5,11 @@ from matplotlib import pyplot as plt
 import time
 from models import Autoencoder
 
-from utils.plotting  import  (generate_and_save_images,
+from utils  import  (generate_and_save_images,
                               save_epochs_curve)
 
-from utils.training import print_epoch,save_checkpoint
-from model_config import *
+from utils import print_epoch,save_checkpoint_to_path
+from model_config import mse
 from .helper import end_routine
 from inference import infer
 
@@ -34,7 +34,7 @@ def train_step(model, x):
 
 def train(ae,train_dataset,train_images, test_images,test_labels,args,verbose=True,save=True):
     ae_loss= []
-    dir_path = 'outputs/{}/{}/{}'.format(args.model, args.anomaly_class, args.model_name)
+    dir_path = 'outputs/{}/{}/{}'.format(args.model_class, args.anomaly_class, args.model_name)
     for epoch in range(args.epochs):
         start = time.time()
 
@@ -46,21 +46,21 @@ def train(ae,train_dataset,train_images, test_images,test_labels,args,verbose=Tr
                                  image_batch[:25,...],
                                  'AE',
                                  args)
-        save_checkpoint(dir_path, ae,'AE', epoch)
+        save_checkpoint_to_path(dir_path, ae, 'AE', epoch)
 
         ae_loss.append(auto_loss)
 
         #print_epoch('AE',epoch,time.time()-start,{'AE Loss':auto_loss.numpy()},None)
         print_epoch('AE', epoch, time.time() - start, auto_loss.numpy(), 'loss')
 
-    save_checkpoint(dir_path, ae, 'AE')
+    save_checkpoint_to_path(dir_path, ae, 'AE')
     save_epochs_curve(dir_path, ae_loss, 'AE loss')
     generate_and_save_images(ae,epoch,image_batch[:25,...],'AE',args)
 
     return ae
 
 def main(train_dataset,train_images,train_labels,test_images,test_labels, test_masks,test_masks_orig,args):
-    if args.data == 'MVTEC':
+    if args.data_name == 'MVTEC':
         ae = Autoencoder_MVTEC(args)
     else:
         ae = Autoencoder(args)

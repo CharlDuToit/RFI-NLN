@@ -2,12 +2,12 @@ from matplotlib import pyplot as plt
 import pandas as pd
 import numpy as np
 from models import Autoencoder
-from utils.metrics import nln, get_nln_errors, get_dists
+from utils import nln, get_nln_errors, get_dists
 from inference import infer
 from data import load_lofar
 from matplotlib import pyplot as plt
 from sklearn.metrics import precision_recall_curve, f1_score
-from utils.data import patches
+from utils import patches
 
 
 def make_grid(img):

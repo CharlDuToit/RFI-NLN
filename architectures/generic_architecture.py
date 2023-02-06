@@ -1,13 +1,14 @@
-from utils.metrics import  DiceLoss, f1, auroc, auprc, save_csv
-from utils.profiling import num_trainable_params, num_non_trainable_params, get_flops
+from utils import DiceLoss, f1, auroc, auprc
+from utils import save_csv
+from utils import num_trainable_params, num_non_trainable_params, get_flops
 
-from utils.training import print_epoch, save_checkpoint
+from utils import print_epoch, save_checkpoint_to_path
 # from model_config import *
 from tensorflow.keras import optimizers
 from tensorflow.keras import losses
 from scipy.io import savemat
 
-from utils.plotting import save_epochs_curve, save_data_masks_inferred, save_data_inferred
+from utils import save_epochs_curve, save_data_masks_inferred, save_data_inferred
 from data_collection import DataCollection
 
 # from utils.data import patches
@@ -379,7 +380,7 @@ class GenericArchitecture:
         # =============================================HELPERS==============================================================
 
     def save_summary(self):
-        with open(self.dir_path + '/model.txt', 'w') as f:
+        with open(self.dir_path + '/summary.txt', 'w') as f:
             self.model.summary(print_fn=lambda x: f.write(x + '\n'))
             f.write(f'GFLOPS patch: {get_flops(self.model) / 1e9}')
 
@@ -393,7 +394,7 @@ class GenericArchitecture:
     def save_checkpoint(self, epoch=-1, model_subtype=None, losses=None):
         if model_subtype is None:
             model_subtype = self.model_type
-        save_checkpoint(self.dir_path, self.model, model_subtype, epoch, losses)
+        save_checkpoint_to_path(self.dir_path, self.model, model_subtype, epoch, losses)
 
     def save_data_masks_images(self, data, masks, masks_inferred, epoch=-1, thresh=-1.0, figsize=(10,20)):
         if 0.0 < thresh < 1.0:
@@ -406,7 +407,7 @@ class GenericArchitecture:
         save_data_inferred(self.dir_path, data, masks_inferred, thresh)
 
     def save_solution_config(self, sol_dict):
-        with open('{}/solution.config'.format(self.dir_path), 'w') as fp:
+        with open('{}/solution.txt'.format(self.dir_path), 'w') as fp:
             for k in sol_dict.keys():
                 fp.write(f'{k}: {sol_dict[k]}\n')
 

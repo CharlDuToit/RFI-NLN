@@ -2,17 +2,12 @@ import os
 import numpy as np
 
 from .flops import get_flops
+from utils.common import summary_file
 
 
-def save_summary(model, args):
-    dir_path = 'outputs/{}/{}/{}'.format(args.model,
-                                         args.anomaly_class,
-                                         args.model_name)
-
-    if not os.path.exists(dir_path):
-        os.makedirs(dir_path)
-
-    with open(dir_path + '/model_summary', 'w') as f:
+def save_summary(model, **kwargs):
+    file = summary_file(**kwargs)
+    with open(file, 'w') as f:
         model.summary(print_fn=lambda x: f.write(x + '\n'))
         f.write(f'GFLOPS: {get_flops(model) / 1e9}')
 
@@ -45,6 +40,17 @@ def save_summary_to_folder(model, folder, args):
     #    f.write(f'GFLOPS image: {flops_image / 1e9}')
 
 
+def params_and_flops_as_dict(model, patches_per_image, **kwargs):
+    n_train_p = num_trainable_params(model)
+    n_nontrain_p = num_non_trainable_params(model)
+    flops_patch = get_flops(model)
+    flops_image = flops_patch * patches_per_image
+    return {
+        'trainable_params': n_train_p,
+        'nontrainable_params': n_nontrain_p,
+        'flops_image': flops_image,
+        'flops_patch': flops_patch
+    }
 
 def num_trainable_params(model):
     return np.sum([np.prod(v.get_shape().as_list()) for v in model.trainable_variables])

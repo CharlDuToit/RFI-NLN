@@ -14,4 +14,4 @@ from .aspp_unet import ASPP_UNET
 from .dknn import DKNN
 from .generic_builder import GenericUnet, GenericBlock
 
-from .model_from_args import get_model_from_args
+from .model_from_args import load_model

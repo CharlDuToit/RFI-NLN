@@ -2,10 +2,10 @@
 from .data_collection import DataCollection
 
 
-def get_data_collection_from_args(args, generate_normal_data=False):
+def load_data_collection(args, generate_normal_data=False):
     #args = resolve_model_config_args(args)
 
-    if args.model in ['DAE', 'DKNN', 'AE', 'AE_SSIM']:
+    if args.model_class in ['DAE', 'DKNN', 'AE', 'AE_SSIM']:
         generate_normal_data = True
     else:
         generate_normal_data = generate_normal_data
@@ -13,7 +13,7 @@ def get_data_collection_from_args(args, generate_normal_data=False):
     if args.optimal_neighbours:
         args.neighbours = [20]
 
-    if args.data in ['HERA', 'HERA_PHASE']:
+    if args.data_name in ['HERA', 'HERA_PHASE']:
         if args.optimal_alpha:
             args.alphas = [0.1]
         data_cllctn = DataCollection(args,
@@ -26,7 +26,7 @@ def get_data_collection_from_args(args, generate_normal_data=False):
                                      combine_min_std_plus=None)
         #data_cllctn.load()
         return data_cllctn
-    if args.data == 'LOFAR':
+    if args.data_name == 'LOFAR':
         if args.optimal_alpha:
             args.alphas = [0.66]
         data_cllctn = DataCollection(args,
@@ -40,7 +40,7 @@ def get_data_collection_from_args(args, generate_normal_data=False):
         #data_cllctn.load()
         return data_cllctn
 
-    if args.data in ['ASTRON_0']:
+    if args.data_name in ['ASTRON_0']:
         if args.optimal_alpha:
             args.alphas = [0.66] # not tested yet
         data_cllctn = DataCollection(args,
@@ -55,7 +55,7 @@ def get_data_collection_from_args(args, generate_normal_data=False):
         #data_cllctn.load()
         return data_cllctn
 
-    if args.data in ['ant_fft_000_094_t4032_f4096',
+    if args.data_name in ['ant_fft_000_094_t4032_f4096',
                      'ant_fft_000_094_t4096_f4096',
                      'ant_fft_000_094_t8128_f8192',
                      'ant_fft_000_094_t12160_f16384']:

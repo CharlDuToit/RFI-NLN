@@ -2,9 +2,9 @@
 import sys
 sys.path.insert(1,'../..')
 
-from .plot import (#save_epochs_curve,
+from .images import (#save_epochs_curve,
                    generate_and_save_images,
-                   save_training_curves,
+                   #save_training_curves,
                    save_data_masks_inferred,
                    save_data_inferred_ae,
                    save_data_nln_dists_combined,

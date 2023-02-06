@@ -7,10 +7,10 @@ N_PATCHES = 10
 
 def plot_neighs(test_images, test_labels, test_masks, x_hat, neighbours, neighbours_dist,model_type, args):
     rs = np.random.randint(0,len(test_labels),N_PATCHES) 
-    if args.data == 'MVTEC' or args.data == 'HERA' or args.data == 'LOFAR': n = 4
+    if args.data_name == 'MVTEC' or args.data_name == 'HERA' or args.data_name == 'LOFAR': n = 4
     fig, ax = plt.subplots(N_PATCHES, args.neighbours[-1]+n, figsize=(10,10))
 
-    if args.data == 'MVTEC':
+    if args.data_name == 'MVTEC':
         if (('grid' in args.anomaly_class) or ('screw' in args.anomaly_class) or ('zipper' in args.anomaly_class)): 
             test_images = test_images[...,0] 
             x_hat = x_hat[...,0] 
@@ -25,7 +25,7 @@ def plot_neighs(test_images, test_labels, test_masks, x_hat, neighbours, neighbo
         ax[i,col].axis('off')
         col+=1
 
-        if args.data == 'MVTEC' or args.data =='HERA' or args.data == 'LOFAR':
+        if args.data_name == 'MVTEC' or args.data_name =='HERA' or args.data_name == 'LOFAR':
             ax[i,col].imshow(test_masks[r,...], interpolation='nearest', aspect='auto'); 
             ax[i,col].set_title('Masks', fontsize=6)
             ax[i,col].axis('off')

@@ -1,6 +1,6 @@
 from .generic_architecture import GenericArchitecture
 
-from utils.metrics import (get_nln_metrics,
+from utils import (get_nln_metrics,
                            #save_metrics_csv,
                            evaluate_performance,
                            #save_results_csv,
@@ -8,12 +8,12 @@ from utils.metrics import (get_nln_metrics,
                             save_csv,
                            get_nln_errors,
                            get_dists)
-from utils.profiling import (num_trainable_params,
+from utils import (num_trainable_params,
                              num_non_trainable_params,
                              get_flops)
 
-from utils.training import print_epoch, save_checkpoint
-from utils.plotting import save_epochs_curve, save_data_masks_inferred, save_data_masks_dknn
+from utils import print_epoch, save_checkpoint_to_path
+from utils import save_epochs_curve, save_data_masks_inferred, save_data_masks_dknn
 from data_collection import DataCollection
 from utils.data import patches
 import time

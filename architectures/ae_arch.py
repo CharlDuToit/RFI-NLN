@@ -1,19 +1,19 @@
 from .generic_architecture import GenericArchitecture
 
-from utils.metrics import (get_nln_metrics,
+from utils import (get_nln_metrics,
                            #save_metrics_csv,
                            evaluate_performance,
                            #save_results_csv,
-                           nln,
+                           #nln,
                             save_csv,
-                           get_nln_errors,
-                           get_dists)
+                           get_nln_errors,)
+                           #get_dists)
 from utils.profiling import (num_trainable_params,
                              num_non_trainable_params,
                              get_flops)
-
-from utils.training import print_epoch, save_checkpoint
-from utils.plotting import save_epochs_curve, save_data_masks_inferred, save_data_inferred_ae, save_data_nln_dists_combined
+from utils import nln, get_dists
+from utils.training import print_epoch, save_checkpoint_to_path
+from utils import save_epochs_curve, save_data_masks_inferred, save_data_inferred_ae, save_data_nln_dists_combined
 from data_collection import DataCollection
 
 from utils.data import patches
@@ -42,8 +42,6 @@ class AEArchitecture(GenericArchitecture):
             os.makedirs(self.dir_path + '/inferred')
 
     def train(self, data_collection: DataCollection):
-        if not data_collection.all_not_none(['normal_train_data']):
-            raise ValueError('data_collection is missing normal_train_data')
 
         normal_train_data_dataset = tf.data.Dataset.from_tensor_slices(
             data_collection.normal_train_data).shuffle(self.buffer_size, seed=42).batch(self.batch_size)
