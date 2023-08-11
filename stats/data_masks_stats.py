@@ -7,7 +7,8 @@ from utils import get_patches, reconstruct
 import matplotlib.pyplot as plt
 import copy
 
-class DataStats:
+
+class DataMasksStats:
     def __init__(self, data, masks, patch_size=None, dir_path='./', name='stats'):
 
         if data is None or masks is None:
@@ -21,10 +22,15 @@ class DataStats:
             masks = get_patches(masks.astype('float'), p_size, s_size, rate, 'VALID').astype(bool)
             #print('Created patches')
 
-        self.data = data
+        if data is not None:
+            self.data = data[..., 0:1]
+        else:
+            self.data = None
         self.masks = masks
         self.patch_size = patch_size
         self.dir_path = dir_path
+        if not os.path.exists(dir_path):
+            os.makedirs(dir_path)
         self.name = name
         self.df = None
 
@@ -32,6 +38,11 @@ class DataStats:
         self.stats_dict = {}
         for key in temp_dict.keys():
             self.stats_dict[key] = []
+
+    def main(self):
+        self.calc_stats()
+        self.save_csv()
+        self.save_agg_csv()
 
     def calc_stats(self):
         for d, m in zip(self.data, self.masks):
@@ -167,13 +178,15 @@ def data_masks_stats(data, masks):
     rfi_std = rfi.std() if rfi_ratio > 0.0 else 0.0
     rfi_min = rfi.min() if rfi_ratio > 0.0 else 0.0
     rfi_max = rfi.max() if rfi_ratio > 0.0 else 0.0
+    rfi_std_over_rfi_mean = rfi_std/rfi_mean if rfi_ratio > 0.0 else 0.0
+
     rfi_min_data_percentile = (data < rfi_min).mean() if rfi_ratio > 0.0 else 0.0
     rfi_min_stds_from_mean = (rfi_min - mean) / std if rfi_ratio > 0.0 else 0.0
     rfi_min_means_from_mean = (rfi_min - mean) / mean if rfi_ratio > 0.0 else 0.0
     rfi_min_div_mean = rfi_min/mean if rfi_ratio > 0.0 else 0.0
     rfi_max_over_rfi_min = rfi_max / rfi_min if rfi_min > 0.0 else 0.0
 
-    rfi_perc10 = np.percentile(rfi, 10)
+    rfi_perc10 = np.percentile(rfi, 10) if rfi_ratio > 0.0 else 0.0
     rfi_perc10_data_percentile = (data < rfi_perc10).mean() if rfi_ratio > 0.0 else 0.0
     rfi_perc10_stds_from_mean = (rfi_perc10 - mean) / std if rfi_ratio > 0.0 else 0.0
     rfi_perc10_over_rfi_min = rfi_perc10 / rfi_min if rfi_min > 0.0 else 0.0
@@ -188,10 +201,14 @@ def data_masks_stats(data, masks):
     nonrfi_max_means_from_mean = (nonrfi_max - mean) / mean if rfi_ratio < 1.0 else 0.0
     nonrfi_max_div_mean = nonrfi_max/mean if rfi_ratio < 1.0 else 0.0
     nonrfi_max_over_nonrfi_min = nonrfi_max / nonrfi_min if nonrfi_min > 0.0 else 0.0
+    nonrfi_std_over_nonrfi_mean = nonrfi_std/nonrfi_mean if rfi_ratio < 1.0 else 0.0
 
-    nonrfi_perc90 = np.percentile(nonrfi, 90)
-    nonrfi_perc90_data_percentile = (data < nonrfi_perc90).mean() if rfi_ratio > 0.0 else 0.0
-    nonrfi_perc90_stds_from_mean = (nonrfi_perc90 - mean) / std if rfi_ratio > 0.0 else 0.0
+
+    rfi_mean_over_nonrfi_mean = rfi_mean/nonrfi_mean if 1.0 > rfi_ratio > 0.0 else 0.0
+
+    nonrfi_perc90 = np.percentile(nonrfi, 90) if rfi_ratio < 1.0 else 0.0
+    nonrfi_perc90_data_percentile = (data < nonrfi_perc90).mean() if rfi_ratio < 1.0 else 0.0
+    nonrfi_perc90_stds_from_mean = (nonrfi_perc90 - mean) / std if rfi_ratio < 1.0 else 0.0
     nonrfi_max_over_nonrfi_perc90 = rfi_perc10 / rfi_min if rfi_min > 0.0 else 0.0
 
     nonrfi_max_over_rfi_min = nonrfi_max/rfi_min if rfi_min > 0.0 else 0.0
@@ -211,11 +228,12 @@ def data_masks_stats(data, masks):
         rfi_std=rfi_std,
         rfi_min=rfi_min,
         rfi_max=rfi_max,
+        rfi_std_over_rfi_mean=rfi_std_over_rfi_mean,
         rfi_min_data_percentile=rfi_min_data_percentile,
         rfi_min_stds_from_mean=rfi_min_stds_from_mean,
         rfi_min_means_from_mean=rfi_min_means_from_mean,
         rfi_min_div_mean=rfi_min_div_mean,
-        rfi_max_over_rfi_min = rfi_max_over_rfi_min,
+        rfi_max_over_rfi_min=rfi_max_over_rfi_min,
 
         rfi_perc10=rfi_perc10,
         rfi_perc10_data_percentile=rfi_perc10_data_percentile,
@@ -226,11 +244,14 @@ def data_masks_stats(data, masks):
         nonrfi_std=nonrfi_std,
         nonrfi_min=nonrfi_min,
         nonrfi_max=nonrfi_max,
+        nonrfi_std_over_nonrfi_mean=nonrfi_std_over_nonrfi_mean,
         nonrfi_max_data_percentile=nonrfi_max_data_percentile,
         nonrfi_max_stds_from_mean=nonrfi_max_stds_from_mean,
         nonrfi_max_means_from_mean=nonrfi_max_means_from_mean,
         nonrfi_max_div_mean=nonrfi_max_div_mean,
         nonrfi_max_over_nonrfi_min=nonrfi_max_over_nonrfi_min,
+
+        rfi_mean_over_nonrfi_mean=rfi_mean_over_nonrfi_mean,
 
         nonrfi_perc90=nonrfi_perc90,
         nonrfi_perc90_data_percentile=nonrfi_perc90_data_percentile,
@@ -248,120 +269,130 @@ def data_masks_stats(data, masks):
 
 
 if __name__ == '__main__':
-
+    # ----------------------  lofar test
     data_path = '/home/ee487519/DatasetsAndConfig/Given/43_Mesarcik_2022/'
     (raw_train_data, raw_train_masks, raw_test_data, raw_test_masks) = get_lofar_data(data_path)
-    #dir_path = './lofar_test_patch_512'
-    dir_path = './lofar_train_patch_512'
-
-    print(raw_train_data.shape)
-    print(raw_test_data.shape)
-
-    # -----------------------------------------
-    files = []
-    for i in range(0,7500,500):
-        data_stats = DataStats(raw_train_data[i:i+500, ...],
-                               raw_train_masks[i:i+500, ...],
-                               dir_path=dir_path,
-                               patch_size=512,
-                               name=f'lofar_train_{i}')
-        data_stats.calc_stats()
-        data_stats.save_csv()
-        files.append(os.path.join(dir_path, data_stats.get_file_name(agg=False, csv=True)))
-    df = pd.read_csv(files[0])
-    for f in files[1:]:
-        df = pd.concat([df, pd.read_csv(f)], ignore_index=True)
-    data_stats = DataStats(None, None, dir_path=dir_path, patch_size=512, name=f'lofar_train')
-    data_stats.df = df
+    print(raw_train_data.shape[0])
+    dir_path = './lofar_test_patch_512_july'
+    data_stats = DataMasksStats(raw_test_data, raw_test_masks, dir_path=dir_path, patch_size=None, name='lofar_test_july')
+    data_stats.main()
+    # -------------------------------
+    # ----------------------  lofar train
+    # data_path = '/home/ee487519/DatasetsAndConfig/Given/43_Mesarcik_2022/'
+    # (raw_train_data, raw_train_masks, raw_test_data, raw_test_masks) = get_lofar_data(data_path)
+    # dir_path = './lofar_train_patch_512_july'
+    # # # -----------------------------------------
+    # files = []
+    # for i in range(0,7500,500):
+    #     print(i)
+    #     interval = 465 if i == 7000 else 500
+    #     stats = DataMasksStats(raw_train_data[i:i+interval, ...],
+    #                            raw_train_masks[i:i+interval, ...],
+    #                            dir_path=dir_path,
+    #                            patch_size=512,
+    #                            name=f'lofar_train_{i}')
+    #     stats.calc_stats()
+    #     stats.save_csv()
+    #     files.append(os.path.join(dir_path, stats.get_file_name(agg=False, csv=True)))
+    # df = pd.read_csv(files[0])
+    # for f in files[1:]:
+    #     df = pd.concat([df, pd.read_csv(f)], ignore_index=True)
+    # stats = DataMasksStats(None, None, dir_path=dir_path, patch_size=512, name=f'lofar_train_july')
+    # stats.df = df
+    # stats.save_csv() # queries
+    # stats.save_agg_csv() # queries
     # -----------------------------------------
 
     # Entire dataset
-    #data_stats = DataStats(raw_test_data, raw_test_masks, dir_path=dir_path, patch_size=512, name='lofar_test')
-    #data_stats = DataStats(raw_train_data, raw_train_masks, dir_path=dir_path, patch_size=512, name='lofar_train')
-    #data_stats = DataStats(None, None, dir_path='./hera_train_patch_512', patch_size=None, name='hera_train_p512')
-    #data_stats = DataStats(None, None, dir_path='./lofar_train_patch_512', patch_size=None, name='lofar_train')
-    #data_stats.load_csv()
+    #stats = DataStats(raw_test_data, raw_test_masks, dir_path=dir_path, patch_size=512, name='lofar_test')
+    #stats = DataStats(raw_train_data, raw_train_masks, dir_path=dir_path, patch_size=512, name='lofar_train')
+    #stats = DataStats(None, None, dir_path='./hera_train_patch_512', patch_size=None, name='hera_train_p512')
 
-    #data_stats.fit_hyperbola('std_over_mean', 'nonrfi_max_stds_from_mean')
-    #data_stats.fit_hyperbola('std_over_mean', 'rfi_min_stds_from_mean')
 
-    #data_stats.save_scatter('std_over_mean', 'rfi_ratio')
-
-    #data_stats.calc_stats()
-
-    data_stats.save_csv()
-    data_stats.save_agg_csv()
-    data_stats.save_csv(query='rfi_ratio>0.0')
-    data_stats.save_agg_csv(query='rfi_ratio>0.0')
-
-    try:
-        data_stats.save_csv(query='rfi_ratio==0.0')
-        data_stats.save_agg_csv(query='rfi_ratio==0.0')
-    except:
-        print('e1')
-
-    try:
-        data_stats.save_csv(query='rfi_ratio==1.0')
-        data_stats.save_agg_csv(query='rfi_ratio==1.0')
-    except:
-        print('e2')
-
-    query = 'rfi_ratio>0.0 and rfi_ratio<1.0 and overlap_ratio==0.0'
-    data_stats.save_csv(query=query)
-    data_stats.save_agg_csv(query=query)
-
-    query = 'rfi_ratio>0.0 and rfi_ratio<1.0 and overlap_ratio>0.0'
-    data_stats.save_csv(query=query)
-    data_stats.save_agg_csv(query=query)
-
-    query = 'rfi_ratio>0.0 and rfi_ratio<1.0 and overlap_ratio>0.0 and rfi_min > 0.0 and rfi_perc10 > 0.0'
-    data_stats.save_csv(query=query)
-    data_stats.save_agg_csv(query=query)
-
-    # print('Saved CSVs')
-    #
-    # data_stats = DataStats(None, None, dir_path='./lofar_train_patch_64', patch_size=None, name='lofar_train')
     # data_stats.load_csv()
+    # data_stats.save_csv(query='rfi_min == 0.0 or nonrfi_min == 0.0')
+    # data_stats.save_agg_csv(query='rfi_min == 0.0 or nonrfi_min == 0.0')
+
+    #stats.fit_hyperbola('std_over_mean', 'nonrfi_max_stds_from_mean')
+    #stats.fit_hyperbola('std_over_mean', 'rfi_min_stds_from_mean')
+
+    #stats.save_scatter('std_over_mean', 'rfi_ratio')
+
+    #stats.calc_stats()
+
+    # stats.save_csv()
+    # stats.save_agg_csv()
+    # stats.save_csv(query='rfi_ratio>0.0')
+    # stats.save_agg_csv(query='rfi_ratio>0.0')
     #
-    data_stats.save_scatter('std_over_mean', 'nonrfi_max_data_percentile', query=query)
-    data_stats.save_scatter('overlap_ratio', 'rfi_min_data_percentile', query=query)
-    data_stats.save_scatter('rfi_ratio', 'nonrfi_max_data_percentile', query=query)
+    # try:
+    #     stats.save_csv(query='rfi_ratio==0.0')
+    #     stats.save_agg_csv(query='rfi_ratio==0.0')
+    # except:
+    #     print('e1')
+    #
+    # try:
+    #     stats.save_csv(query='rfi_ratio==1.0')
+    #     stats.save_agg_csv(query='rfi_ratio==1.0')
+    # except:
+    #     print('e2')
+    #
+    # query = 'rfi_ratio>0.0 and rfi_ratio<1.0 and overlap_ratio==0.0'
+    # stats.save_csv(query=query)
+    # stats.save_agg_csv(query=query)
+    #
+    # query = 'rfi_ratio>0.0 and rfi_ratio<1.0 and overlap_ratio>0.0'
+    # stats.save_csv(query=query)
+    # stats.save_agg_csv(query=query)
+    #
+    # query = 'rfi_ratio>0.0 and rfi_ratio<1.0 and overlap_ratio>0.0 and rfi_min > 0.0 and rfi_perc10 > 0.0'
+    # stats.save_csv(query=query)
+    # stats.save_agg_csv(query=query)
+    #
+    # # print('Saved CSVs')
+    # #
+    # # stats = DataStats(None, None, dir_path='./lofar_train_patch_64', patch_size=None, name='lofar_train')
+    # # stats.load_csv()
+    # #
+    # stats.save_scatter('std_over_mean', 'nonrfi_max_data_percentile', query=query)
+    # stats.save_scatter('overlap_ratio', 'rfi_min_data_percentile', query=query)
+    # stats.save_scatter('rfi_ratio', 'nonrfi_max_data_percentile', query=query)
+    #
+    # stats.save_scatter('std_over_mean', 'nonrfi_max_stds_from_mean', query=query)
+    # stats.save_scatter('std_over_mean', 'rfi_min_stds_from_mean', query=query)
+    # stats.save_scatter('overlap_ratio', 'nonrfi_max_stds_from_mean', query=query)
+    # stats.save_scatter('overlap_ratio', 'rfi_min_stds_from_mean', query=query)
+    #
+    # stats.save_scatter('rfi_ratio', 'nonrfi_max_stds_from_mean', query=query)
+    # stats.save_scatter('rfi_ratio', 'rfi_min_stds_from_mean', query=query)
+    #
+    # stats.save_scatter('mean', 'rfi_min_div_mean', query=query)
+    # stats.save_scatter('mean', 'nonrfi_max_div_mean', query=query)
+    #
+    # stats.save_scatter('mean', 'nonrfi_max_means_from_mean', query=query)
+    # stats.save_scatter('mean', 'rfi_min_means_from_mean', query=query)
+    #
+    # stats.save_scatter('std_over_mean', 'nonrfi_max_means_from_mean', query=query)
+    # stats.save_scatter('std_over_mean', 'rfi_min_means_from_mean', query=query)
+    #
+    # stats.save_scatter('std_over_mean', 'nonrfi_perc90_stds_from_mean', query=query)
+    # stats.save_scatter('std_over_mean', 'rfi_perc10_stds_from_mean', query=query)
+    #
+    # stats.save_scatter('std_over_mean', 'nonrfi_perc90_data_percentile', query=query)
+    # stats.save_scatter('std_over_mean', 'rfi_perc10_data_percentile', query=query)
+    #
+    # stats.save_scatter('std_over_mean', 'nonrfi_max_over_nonrfi_perc90', query=query)
+    # stats.save_scatter('std_over_mean', 'rfi_perc10_over_rfi_min', query=query)
 
-    data_stats.save_scatter('std_over_mean', 'nonrfi_max_stds_from_mean', query=query)
-    data_stats.save_scatter('std_over_mean', 'rfi_min_stds_from_mean', query=query)
-    data_stats.save_scatter('overlap_ratio', 'nonrfi_max_stds_from_mean', query=query)
-    data_stats.save_scatter('overlap_ratio', 'rfi_min_stds_from_mean', query=query)
-
-    data_stats.save_scatter('rfi_ratio', 'nonrfi_max_stds_from_mean', query=query)
-    data_stats.save_scatter('rfi_ratio', 'rfi_min_stds_from_mean', query=query)
-
-    data_stats.save_scatter('mean', 'rfi_min_div_mean', query=query)
-    data_stats.save_scatter('mean', 'nonrfi_max_div_mean', query=query)
-
-    data_stats.save_scatter('mean', 'nonrfi_max_means_from_mean', query=query)
-    data_stats.save_scatter('mean', 'rfi_min_means_from_mean', query=query)
-
-    data_stats.save_scatter('std_over_mean', 'nonrfi_max_means_from_mean', query=query)
-    data_stats.save_scatter('std_over_mean', 'rfi_min_means_from_mean', query=query)
-
-    data_stats.save_scatter('std_over_mean', 'nonrfi_perc90_stds_from_mean', query=query)
-    data_stats.save_scatter('std_over_mean', 'rfi_perc10_stds_from_mean', query=query)
-
-    data_stats.save_scatter('std_over_mean', 'nonrfi_perc90_data_percentile', query=query)
-    data_stats.save_scatter('std_over_mean', 'rfi_perc10_data_percentile', query=query)
-
-    data_stats.save_scatter('std_over_mean', 'nonrfi_max_over_nonrfi_perc90', query=query)
-    data_stats.save_scatter('std_over_mean', 'rfi_perc10_over_rfi_min', query=query)
-
-    #data_stats.save_scatter('std_over_mean', 'nonrfi_max_over_nonrfi_perc90', query=query)
-    #data_stats.save_scatter('std_over_mean', 'rfi_perc10_over_nonrfi_perc90', query=query)
+    #stats.save_scatter('std_over_mean', 'nonrfi_max_over_nonrfi_perc90', query=query)
+    #stats.save_scatter('std_over_mean', 'rfi_perc10_over_nonrfi_perc90', query=query)
 
 
 
     #
     # # Not useful scatters
-    # # data_stats.save_scatter('mean', 'rfi_min_data_percentile', query='rfi_ratio>0.0 and rfi_overlap_ratio>0.0')
-    # # data_stats.save_scatter('mean', 'nonrfi_max_data_percentile', query='rfi_ratio>0.0 and rfi_overlap_ratio>0.0')
-    # # data_stats.save_scatter('overlap_ratio', 'nonrfi_max_data_percentile', query='rfi_ratio>0.0 and rfi_overlap_ratio>0.0')
-    # # data_stats.save_scatter('rfi_ratio', 'rfi_min_data_percentile', query='rfi_ratio>0.0 and rfi_overlap_ratio>0.0')
-    # # data_stats.save_scatter('std_over_mean', 'rfi_min_data_percentile', query='rfi_ratio>0.0 and rfi_overlap_ratio>0.0')
+    # # stats.save_scatter('mean', 'rfi_min_data_percentile', query='rfi_ratio>0.0 and rfi_overlap_ratio>0.0')
+    # # stats.save_scatter('mean', 'nonrfi_max_data_percentile', query='rfi_ratio>0.0 and rfi_overlap_ratio>0.0')
+    # # stats.save_scatter('overlap_ratio', 'nonrfi_max_data_percentile', query='rfi_ratio>0.0 and rfi_overlap_ratio>0.0')
+    # # stats.save_scatter('rfi_ratio', 'rfi_min_data_percentile', query='rfi_ratio>0.0 and rfi_overlap_ratio>0.0')
+    # # stats.save_scatter('std_over_mean', 'rfi_min_data_percentile', query='rfi_ratio>0.0 and rfi_overlap_ratio>0.0')

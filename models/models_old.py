@@ -384,6 +384,40 @@ def RFI_NET(args, n_filters=32, dropout=0.05, batchnorm=True):
     return model
 
 
+# def RNET():
+#     input_data = tf.keras.Input((64,64,1), name='data')
+#
+#     xp = layers.Conv2D(filters=12, kernel_size=5, strides=(1, 1), padding='same')(input_data)
+#     x = layers.BatchNormalization()(xp)
+#     x = tf.nn.relu(x)
+#     x1 = layers.Conv2D(filters=12, kernel_size=5, strides=(1, 1), padding='same')(x)
+#     x1 = layers.BatchNormalization()(x1)
+#     x1 = tf.nn.relu(x1)
+#     x2 = layers.Conv2D(filters=12, kernel_size=5, strides=(1, 1), padding='same')(x1)
+#     x2 = layers.BatchNormalization()(x2)
+#     x2 = tf.nn.relu(x2)
+#
+#     x3 = x2 + xp
+#
+#     x4 = layers.Conv2D(filters=12, kernel_size=5, strides=(1, 1), padding='same')(x3)
+#     x4 = layers.BatchNormalization()(x4)
+#     x4 = tf.nn.relu(x4)
+#
+#     x6 = layers.Conv2D(filters=12, kernel_size=5, strides=(1, 1), padding='same')(x4)
+#     x6 = layers.BatchNormalization()(x6)
+#     x6 = tf.nn.relu(x6)
+#
+#     x7 = x6 + x3
+#
+#     x8 = layers.Conv2D(filters=12, kernel_size=5, strides=(1, 1), padding='same')(x7)
+#     x8 = layers.BatchNormalization()(x8)
+#     x8 = tf.nn.relu(x8)
+#
+#     x_out = layers.Conv2D(filters=1, kernel_size=5, strides=(1, 1), padding='same', activation=tf.nn.relu)(x8)
+#
+#     model = tf.keras.Model(inputs=[input_data], outputs=[x_out])
+#     return model
+
 def CNN_RFI_SUN_block(input_tensor,
                       n_filters,
                       conv_kernel_size=(3, 3),

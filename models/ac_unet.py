@@ -1,13 +1,13 @@
 import tensorflow as tf
 import numpy as np
-from tensorflow.keras import layers
-#from model_config import n_layers, n_filters
+# from tensorflow.keras import layers
+# from model_config import n_layers, n_filters
 
 from .generic_builder import GenericBlock, GenericUnet
 
 tf.keras.backend.set_floatx('float32')
 
-def AC_UNET(input_shape, height, filters, dropout, kernel_regularizer, level_blocks, final_activation, dilation_rate, **kwargs):
+def AC_UNET(input_shape, height, filters, dropout, kernel_regularizer, level_blocks, activation, final_activation, dilation_rate, bn_first, **kwargs):
     """
     Charl's implementation according to the article:
     0 Radio frequency interference detection based on the AC-UNet model
@@ -28,16 +28,27 @@ def AC_UNET(input_shape, height, filters, dropout, kernel_regularizer, level_blo
     two-layer upsampling layers - see above paragraph
     """
     input_data = tf.keras.Input(input_shape, name='data')
+    if bn_first:
+        input_data = GenericBlock('b')(input_data)
     max_height = np.floor(np.log2(input_shape[0])).astype(int) - 1  # why -1?  minimum tensor size 2x2
     height = max_height if height is None else np.minimum(height, max_height)
 
     dilation_rate = dilation_rate if dilation_rate > 1 else 2  # pretty pointless to have dr of 1
 
-    level_block = GenericBlock('ncbad', filters, blocks=level_blocks, dilation_rate=dilation_rate,
+    level_block = GenericBlock('ncbad', filters, activation=activation, blocks=level_blocks, dilation_rate=dilation_rate,
                                dropout=dropout, kernel_regularizer=kernel_regularizer)
     x = GenericUnet(height, level_block=level_block)(input_data)
 
     x = GenericBlock('ca', 1, kernel_size=1, strides=1, activation=final_activation)(x)
 
     model = tf.keras.Model(inputs=[input_data], outputs=[x])
+    return model
+
+def freeze_AC_UNET(model: tf.keras.Model):
+    for i in range(len(model.layers)):
+        if hasattr(model.layers[i], 'trainable'):
+            model.layers[i].trainable = False
+    model.layers[-2].trainable = True # last conv
+    model.layers[-5].trainable = True # last BN
+    model.layers[-6].trainable = True  # 2nd last conv
     return model

@@ -9,6 +9,7 @@ from .splitter import split
 from .batcher import batch
 from .channels import first_channels
 from .shuffler import shuffle
+from .replace_zeros import replace_zeros_with_min
 from utils.flagging import flag_data
 
 
@@ -23,7 +24,10 @@ def preprocess(data,
                clipper,
                std_min,
                std_max,
+               perc_min,
+               perc_max,
                clip_per_image,
+               rescale,
                scale_per_image,
                log,
                patches,
@@ -39,25 +43,34 @@ def preprocess(data,
     # ret_masks = copy.deepcopy(masks)
 
     # limit
-    if limit is not None and 'test' not in data_subset:
+    print(limit)
+    print(perc_min)
+    if limit is not None and limit != 'None' and 'test' not in data_subset:
+        limit = int(limit)
         data = data[:limit]
         if masks is not None:
             masks = masks[:limit]
 
     # Flag
-    if rfi_threshold is not None:
+    if rfi_threshold is not None and rfi_threshold != 'None':
         if (flag_test_data and 'test' in data_subset) or 'test' not in data_subset:
             masks = flag_data(data, data_name, rfi_threshold)
 
+    # Replace zeros in each image with min nonzero value in image
+    data[..., 0] = replace_zeros_with_min(data[..., 0])  # (N_im, width, height, channels)
+
     # Clip
-    data = clip(data, masks, std_min, std_max, clip_per_image, data_name, clipper)
+    data[..., 0:1] = clip(data[..., 0:1], masks, std_min, std_max, perc_min, perc_max, clip_per_image, data_name, clipper)
 
     # log
     if log:
         data[..., 0] = np.log(data[..., 0])
 
     # Scale
-    data[..., 0] = scale(data[..., 0], scale_per_image)
+    if rescale:
+        data[..., 0] = scale(data[..., 0], scale_per_image)
+        if data.shape[-1] == 2:  # phase
+            data[..., 1] = scale(data[..., 1], scale_per_image=False)
 
     # Patches
     if patches:
@@ -84,7 +97,10 @@ def preprocess_all(train_data,
                    clipper,
                    std_min,
                    std_max,
+                   perc_min,
+                   perc_max,
                    clip_per_image,
+                   rescale,
                    scale_per_image,
                    log,
                    patches,
@@ -92,6 +108,7 @@ def preprocess_all(train_data,
                    patch_y,
                    patch_stride_x,
                    patch_stride_y,
+                   train_with_test,
                    **kwargs):
     # ret_data = copy.deepcopy(data)
     # ret_masks = copy.deepcopy(masks)
@@ -110,16 +127,27 @@ def preprocess_all(train_data,
         raise ValueError('train_data and test_data is both None')
 
     # Train on hyperparameter data ?
-    if task in ('train', 'transfer_train'):
+    if task in ('train', 'transfer_train') and not train_with_test:
         shuffle(42, train_data, train_masks)
         if use_hyp_data:
             train_data, train_masks = split(0.2, train_data, train_masks)[2:4]
         else:
             train_data, train_masks = split(0.2, train_data, train_masks)[0:2]
 
+    # Train with test set data?
+    # print(train_with_test)
+    if train_with_test:
+        # print('aaaaaaaaaaaa')
+        limit = int(limit)
+        shuffle_seed = shuffle(shuffle_seed, test_data, test_masks)
+        train_data, train_masks = test_data[:limit], test_masks[:limit]
+        test_data, test_masks = test_data[limit:], test_masks[limit:]
+    else:
+        # affects train-val split if patches arent shuffled
+        shuffle_seed = shuffle(shuffle_seed, train_data, train_masks)
+
     # Preprocess training data
     input_shape = None
-    shuffle_seed = shuffle(shuffle_seed, train_data, train_masks)
     if train_data is not None:
         train_data, train_masks = preprocess(train_data,
                                              train_masks,
@@ -130,7 +158,10 @@ def preprocess_all(train_data,
                                              clipper=clipper,
                                              std_min=std_min,
                                              std_max=std_max,
+                                             perc_min=perc_min,
+                                             perc_max=perc_max,
                                              clip_per_image=clip_per_image,
+                                             rescale=rescale,
                                              scale_per_image=scale_per_image,
                                              log=log,
                                              patches=patches,
@@ -153,7 +184,10 @@ def preprocess_all(train_data,
                                            clipper=clipper,
                                            std_min=std_min,
                                            std_max=std_max,
+                                           perc_min=perc_min,
+                                           perc_max=perc_max,
                                            clip_per_image=clip_per_image,
+                                           rescale=rescale,
                                            scale_per_image=scale_per_image,
                                            log=log,
                                            patches=patches,
@@ -172,8 +206,8 @@ def preprocess_all(train_data,
 
     # Split to train and validation sets
     val_data, val_masks, num_val, num_train, num_test = None, None, 0, 0, 0
-    if task in ('train', 'transfer_train'):
-        train_data, train_masks, val_data, val_masks = split(val_split, train_data, train_masks)
+    #if task in ('train', 'transfer_train'):
+    train_data, train_masks, val_data, val_masks = split(val_split, train_data, train_masks)
 
     # Record number of training and validation images
     if train_data is not None:
@@ -198,18 +232,3 @@ def preprocess_all(train_data,
     print('Preproccess time: {:.2f} sec'.format(time.time() - start))
 
     return train_data, train_masks, val_data, val_masks, test_data, test_masks, results_dict
-
-
-    # # Batch it up
-    # (train_data_batches,
-    #  train_masks_batches,
-    #  val_data_batches,
-    #  val_masks_batches,
-    #  test_data_batches,
-    #  test_masks_batches) = batch(kwargs['batch_size'],
-    #                              train_data,
-    #                              train_masks,
-    #                              val_data,
-    #                              val_masks,
-    #                              test_data,
-    #                              test_masks)

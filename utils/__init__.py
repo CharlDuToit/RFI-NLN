@@ -1,4 +1,5 @@
 #INIT FILE
+from .bounding_boxes import *
 from .flagging import *
 from .data import *
 from .profiling import *

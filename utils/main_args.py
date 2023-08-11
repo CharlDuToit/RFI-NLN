@@ -3,6 +3,8 @@ import os
 #from utils.data import sizes
 from coolname import generate_slug as new_name
 #from .hardcoded_args import resolve_model_config_args
+import numpy as np
+from .results import load_csv
 
 """
     Pretty self explanatory, gets arguments for training and adds them to config
@@ -23,18 +25,27 @@ def str2bool(v):
 parser = argparse.ArgumentParser(description='Train generative anomaly detection models')
 
 parser.add_argument('-model_class', metavar='-m', type=str, default='AE',
-                    choices={'AC_UNET', 'UNET', 'AE', 'DAE', 'DKNN', 'RNET', 'CNN_RFI_SUN', 'RFI_NET', 'AE-SSIM', 'DSC_DUAL_RESUNET', 'DSC_MONO_RESUNET', 'ASPP_UNET'},
+                    choices={'BB_NET', 'AC_UNET', 'UNET', 'AE', 'DAE', 'DKNN', 'RNET', 'CNN_RFI_SUN', 'RFI_NET', 'AE-SSIM', 'DSC_DUAL_RESUNET', 'DSC_MONO_RESUNET', 'ASPP_UNET', 'RNET5'},
                     help='Which model to train and evaluate')
 parser.add_argument('-task', metavar='-t', type=str, default='train',
-                    choices={'train', 'eval', 'infer', 'transfer_train'},
+                    choices={'train', 'eval', 'eval_test', 'infer', 'transfer_train'},
                     help='Task to perform')
+parser.add_argument('-freeze_top_layers', metavar='-ftl', type=str2bool, default=False,
+                    help='Freeze top 2 layers?')
+parser.add_argument('-cmd_args', metavar='-cmdargs', type=str, nargs='+', default=['data_path', 'data_name'],
+                    help='Cmd args to overwrite csv args when loading trained model')
+parser.add_argument('-rfi_set', metavar='-rs', type=str, default='combined',
+                    choices={'low', 'high', 'combined', 'separate'},
+                    help='Train only on low or high rfi images')
+parser.add_argument('-rfi_split_ratio', metavar='-rs', type=float, default=0.01,
+                    help='RFI ratio to split data into low and high sets')
 parser.add_argument('-model_name', metavar='-mn', type=str, default='None',
                     help='Name of already existing model with checkpoint from which to do inference')
 parser.add_argument('-parent_model_name', metavar='-pmn', type=str, default='None',
                     help='Name of already existing model with checkpoint from which to continue training')
 parser.add_argument('-limit', metavar='-l', type=str, default='None',
                     help='Limit on the number of samples in training data ')
-parser.add_argument('-anomaly_class', metavar='-a', type=str, default='rfi',
+parser.add_argument('-anomaly_class', metavar='-ac', type=str, default='rfi',
                     help='The labels of the anomalous class')
 parser.add_argument('-anomaly_type', metavar='-at', type=str, default='MISO',
                     choices={'MISO', 'SIMO'}, help='The anomaly scheme whether it is MISO or SIMO')
@@ -63,6 +74,10 @@ parser.add_argument('-debug', metavar='-de', type=str, default='0',
                     choices={'0', '1', '2', '3'}, help='TF debug level')
 parser.add_argument('-log', metavar='-log', type=str2bool, default=True,
                     help='Take log of data?')
+parser.add_argument('-rescale', metavar='-rescl', type=str2bool, default=True,
+                    help='Rescale data?')
+parser.add_argument('-bn_first', metavar='-bn_first', type=str2bool, default=False,
+                    help='First layer BN?')
 parser.add_argument('-rotate', metavar='-rot', type=str2bool, default=False,
                     help='Train on rotated augmentations?')
 # CROP IS NEVER ACTUALLY USED
@@ -73,6 +88,8 @@ parser.add_argument('-crop_x', metavar='-cx', type=int,
 parser.add_argument('-crop_y', metavar='-cy', type=int,
                     help='y-dimension of crop')
 # CROP IS NEVER ACTUALLY USED
+parser.add_argument('-train_with_test', metavar='-twt', type=str2bool, default=False,
+                    help='Train on test set? limit will determine how many')
 parser.add_argument('-patches', metavar='-ptch', type=str2bool, default=False,
                     help='Train on patches?')
 parser.add_argument('-patch_x', metavar='-px', type=int, default=-1,
@@ -96,12 +113,16 @@ parser.add_argument('-scale_per_image', metavar='-spi', type=str2bool, default=T
 parser.add_argument('-clip_per_image', metavar='-cpi', type=str2bool, default=True,
                     help='Clip per image or for entire dataset')
 parser.add_argument('-clipper', metavar='-clip', type=str, default='None',
-                    choices={'None', 'std', 'dyn_std', 'known'},
+                    choices={'None', 'std', 'dyn_std', 'known', 'perc'},
                     help='Clip strategy to use')
-parser.add_argument('-std_max', metavar='-sp', type=float, default=4,
+parser.add_argument('-std_max', metavar='-sma', type=float, default=4,
                     help='Number of stds from mean to max clip')
-parser.add_argument('-std_min', metavar='-sp', type=float, default=-1,
+parser.add_argument('-std_min', metavar='-smi', type=float, default=-1,
                     help='Number of stds from mean to min clip')
+parser.add_argument('-perc_max', metavar='-pma', type=float, default=95,
+                    help='Maximum percentile to clip')
+parser.add_argument('-perc_min', metavar='-pmi', type=float, default=-5,
+                    help='Minimum percentile to clip')
 parser.add_argument('-filters', metavar='-nf', type=int, default=16,
                     help='base number of filters')
 parser.add_argument('-height', metavar='-h', type=int, default=3,
@@ -125,12 +146,16 @@ parser.add_argument('-use_hyp_data', metavar='-hypd', type=str2bool, default=Fal
                     help='Use reduced dataset for hyper-parameter search')
 parser.add_argument('-lr', metavar='-lr', type=float, default=1e-4,
                     help='Learning rate')
+parser.add_argument('-lr_lin_decay', metavar='-lrlind', type=float, default=1.0,
+                    help='Ratio of initial learning rate to linearly decay to at last epoch')
 parser.add_argument('-loss', metavar='-ls', type=str, default='bce',
-                    choices={'bce', 'mse', 'dice'},
                     help='Loss function')
 parser.add_argument('-kernel_regularizer', metavar='-kr', type=str, default='None',
                     choices={'l2', 'l1', 'None'},
                     help='Kernel regularizer')
+# parser.add_argument('-kernel_initializer', metavar='-ki', type=str, default='glorot_uniform',
+#                     choices={'glorot_uniform', 'he_normal', 'lecun_normal'},
+#                     help='Kernel regularizer')
 parser.add_argument('-input_channels', metavar='-ch', type=int, default=0,
                     help='Number of channels to extract from data. 0 will extract all channels')
 parser.add_argument('-dilation_rate', metavar='-dilr', type=int, default=3,
@@ -146,13 +171,21 @@ parser.add_argument('-shuffle_seed', metavar='-ss', type=str, default='None',
 parser.add_argument('-val_split', metavar='-vs', type=float, default=0.2,
                     help='Validation split')
 parser.add_argument('-final_activation', metavar='-fa', type=str, default='sigmoid',
-                    help='Final activation function')
+                    help='Final activation function',
+                    choices={'relu', 'selu', 'elu', 'gelu', 'sigmoid', 'None'}),
+parser.add_argument('-activation', metavar='-a', type=str, default='relu',
+                    help='Activation function for hidden layers',
+                    choices={'relu', 'selu', 'elu', 'gelu', 'None'})
 parser.add_argument('-output_path', metavar='-op', type=str, default='./outputs',
                     help='Path where models are saved')
 parser.add_argument('-save_dataset', metavar='-sd', type=str2bool, default=False,
                     help='Save entire inferred dataset')
 parser.add_argument('-shuffle_patches', metavar='-sp', type=str2bool, default=False,
                     help='Shuffle the patches? ')
+parser.add_argument('-calc_train_val_auc', metavar='-tvauc', type=str2bool, default=True,
+                    help='Caluclate train and val auc metrics?')
+parser.add_argument('-n_splits', metavar='-nsplit', type=int, default=5,
+                    help='Number of subgroups to divide batches for less memory')
 
 args = parser.parse_args()
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = args.debug
@@ -253,4 +286,91 @@ if ((args.data_name == 'MNIST') or
         (args.data_name == 'FASHION_MNIST')):
     args.anomaly_class = int(args.anomaly_class)
 
-#args = resolve_model_config_args(args)
+
+def df_to_kwargs(df_all, task='eval', parent_model_name=None, model_name=None, cmd_args=('data_path', 'data_name'), **kwargs):
+    """Loads every csv. Can filter it afterwards"""
+    if task == 'train':
+        return None
+
+    if df_all is None:
+        print('loaded df is None')
+        return None
+
+    if (parent_model_name is not None and parent_model_name != 'None') and task == 'transfer_train':
+        df = df_all.query(f'model_name=="{parent_model_name}"')
+    elif (model_name is not None and model_name != 'None') and task in ('eval', 'infer', 'eval_test'):
+        df = df_all.query(f'model_name=="{model_name}"')
+    else:
+        print('Tried to query df')
+        return None
+
+    list_kwargs = df.to_dict('records')
+    if len(list_kwargs) == 0:
+        print('Queried df has 0 rows')
+        return None
+
+    if len(list_kwargs) == 1:
+        new_kwargs = list_kwargs[0]
+    else:
+        for i in range(len(list_kwargs)):
+            if not np.isnan(list_kwargs[i]['bn_first']): break
+        new_kwargs = list_kwargs[i]
+
+    for arg in cmd_args:
+        if arg in kwargs.keys():
+            new_kwargs[arg] = kwargs[arg]
+
+    new_kwargs['task'] = task
+    new_kwargs['cmd_args'] = cmd_args
+    if task == 'transfer_train':
+        new_kwargs['parent_model_name'] = parent_model_name
+        new_kwargs['model_name'] = model_name
+
+    print('Loaded trained model kwargs from csv, overwrote cmd args: ', cmd_args)
+    return new_kwargs
+
+
+def validate_main_kwargs_dict(kwargs: dict):
+    if kwargs['task'] != 'train':
+        try:
+            df = load_csv(**kwargs)
+            kwargs_ = df_to_kwargs(df, **kwargs)
+            if kwargs_ is None:
+                print('Failed to load trained mddel kwargs, using all cmd args')
+            else:
+                kwargs = kwargs_
+        except Exception as e:
+            pass
+
+    if kwargs['clipper'] in ('None', None, 'known'):
+        kwargs['std_min'] = None
+        kwargs['std_max'] = None
+        kwargs['perc_min'] = None
+        kwargs['perc_max'] = None
+    elif kwargs['clipper'] == 'std':
+        kwargs['perc_min'] = None
+        kwargs['perc_max'] = None
+    elif kwargs['clipper'] == 'perc':
+        kwargs['std_min'] = None
+        kwargs['std_max'] = None
+
+    if kwargs['model_class'] in ('BB_NET',):
+        kwargs['loss'] = 'bb'
+
+    # if kwargs['task'] in ('eval', 'infer'):
+    #     kwargs['early_stop'] = None
+    #     #kwargs['lr'] = None
+    #     #kwargs['loss'] = None
+    #     #kwargs['epochs'] = None
+
+    if kwargs['model_class'] not in ('AE', 'DAE', 'DKNN'):
+        kwargs['latent_dim'] = None
+        kwargs['alphas'] = None
+        kwargs['neighbours'] = None
+        kwargs['radius'] = None
+        kwargs['algorithm'] = None
+        kwargs['optimal_neighbours'] = None
+        kwargs['optimal_alpha'] = None
+
+    return kwargs
+

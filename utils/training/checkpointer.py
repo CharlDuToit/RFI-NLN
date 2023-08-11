@@ -48,6 +48,27 @@ def save_checkpoint(model, output_path, model_class, anomaly_class, model_name, 
     #        model.save_weights(file)
 
 
-def load_checkpoint(model, output_path, model_class, anomaly_class, model_name, model_type=None, **kwargs):
-    file = checkpoint_file(output_path, model_class, anomaly_class, model_name, model_type)
-    model.load_weights(file)
+def load_checkpoint(model, output_path, model_class, anomaly_class, model_name, model_type=None, rfi_set='combined',
+                    task='train', parent_model_name=None, load_parent=False, **kwargs):
+    # if task != 'transfer_train' or not load_parent:
+    if not load_parent:
+        print(f'Loading checkpoint for {model_name}')
+        if rfi_set == 'separate':
+            file_low = checkpoint_file(output_path, model_class, anomaly_class, model_name, model_type='low')
+            file_high = checkpoint_file(output_path, model_class, anomaly_class, model_name, model_type='high')
+            model[0].load_weights(file_low)
+            model[1].load_weights(file_high)
+        else:
+            file = checkpoint_file(output_path, model_class, anomaly_class, model_name, model_type)
+            model.load_weights(file)
+    else:
+        print(f'Loading checkpoint for {parent_model_name}')
+        if rfi_set == 'separate':
+            file_low = checkpoint_file(output_path, model_class, anomaly_class, parent_model_name, model_type='low')
+            file_high = checkpoint_file(output_path, model_class, anomaly_class, parent_model_name, model_type='high')
+            model[0].load_weights(file_low)
+            model[1].load_weights(file_high)
+        else:
+            file = checkpoint_file(output_path, model_class, anomaly_class, parent_model_name, model_type)
+            model.load_weights(file)
+

@@ -6,13 +6,19 @@ import numpy as np
 # last epoch
 AGG_FIELDS = (
     'test_f1', 'test_auroc', 'test_auprc', 'val_f1', 'val_auroc', 'val_auprc', 'time_image', 'flops_image',
-    'train_loss', 'val_loss', 'last_epoch', 'trainable_params'
+    'train_loss', 'val_loss', 'last_epoch', 'trainable_params', 'params',
 )
+
+# without params and flops
+# AGG_FIELDS = (
+#     'test_f1', 'test_auroc', 'test_auprc', 'val_f1', 'val_auroc', 'val_auprc', 'time_image',
+#     'train_loss', 'val_loss', 'last_epoch',
+# )
 
 # early_stop, final_activation
 GROUPBY_FIELDS = (
-    'data', 'model', 'anomaly_class', 'anomaly_type', 'rfi_threshold', 'ood_rfi', 'limit', 'use_hyp_data', 'epochs',
-    'batch_size', 'lr', 'std_plus', 'std_minus', 'per_image', 'filters', 'height', 'dropout', 'kernel_regularizer',
+    'data_name', 'model_class', 'anomaly_class', 'anomaly_type', 'rfi_threshold', 'ood_rfi', 'limit', 'use_hyp_data', 'epochs',
+    'batch_size', 'lr', 'std_plus', 'std_minus', 'clip_per_image', 'filters', 'height', 'dropout', 'kernel_regularizer',
     'level_blocks', 'dilation_rate', 'patch_x', 'patch_y', 'loss', 'lofar_subset', 'latent_dim', 'alpha',
     'neighbour', 'algorithm', 'combine_min_std_plus', # early_stop, final_activation
 )
@@ -54,17 +60,17 @@ def query_df(df: pd.DataFrame, query_strings: list[str], incl_models=None, excl_
         qs = [qs]
 
     if incl_models is not None and len(incl_models) > 0:
-        incl_models = ['( model == "' + m + '" )' for m in incl_models]
+        incl_models = ['( model_class == "' + m + '" )' for m in incl_models]
         incl_models_expr = ' or '.join(incl_models)
         qs.append(incl_models_expr)
 
     if excl_models is not None and len(excl_models) > 0:
-        excl_models = ['( model != "' + m + '" )' for m in excl_models]
+        excl_models = ['( model_class != "' + m + '" )' for m in excl_models]
         excl_models_expr = ' and '.join(excl_models)
         qs.append(excl_models_expr)
 
     if datasets is not None and len(datasets) > 0:
-        datasets = ['( data == "' + d + '" )' for d in datasets]
+        datasets = ['( data_name == "' + d + '" )' for d in datasets]
         datasets_expr = ' or '.join(datasets)
         qs.append(datasets_expr)
 
@@ -148,16 +154,17 @@ def signif_row(row, p):
 def row_to_latex_str(row, table_fields: list[str], label_fields: list[str], label_format: str, std=False):
 
     row_vals = [get_val(row, f) for f in table_fields]
-    row_vals = signif_row(row_vals, 4)
+    row_vals = signif_row(row_vals, 3)
     row_vals = [str(val) for val in row_vals]
 
     if std:
         std_vals = [get_val(row, f, 'std') for f in table_fields]
-        std_vals = signif_row(std_vals, 4)
+        std_vals = signif_row(std_vals, 1)
         std_vals = [str(val) for val in std_vals]
-        row_vals = [f'{mean}\\pm{std}' for mean, std in zip(row_vals, std_vals)]
+        row_vals = [f'{mean}$\\pm${std}' for mean, std in zip(row_vals, std_vals)]
 
     label = get_label(row, label_fields, label_format)
+    label = label.replace('_', '\\_')
     row_vals = [label] + row_vals
     row_str = ' & '.join(row_vals)
     row_str += ' \\\\'
@@ -179,20 +186,43 @@ def get_vals(df, field: str, agg=None):
     return vals
 
 
+def remove_label_fields(label_fields, fields_to_remove):
+    lfs = copy.deepcopy(label_fields)
+    for f in fields_to_remove:
+        if f in lfs:
+            lfs.remove(f)
+    return lfs
+
+
 def get_label(row, label_fields: list[str], label_format: str):
     """
     row from a pd.dataframe
     label_fields is a list of fields in row
     label_format must be one of 'full', 'empty', 'short' """
 
+    lfs = copy.deepcopy(label_fields)
+    if 'clipper' in lfs:
+        clipper = get_val(row, 'clipper')
+        if clipper in ('known', 'dyn_std'):
+            lfs = remove_label_fields(lfs, ['std_min', 'std_max', 'perc_min', 'perc_max'])
+        if clipper in ('std',):
+            lfs = remove_label_fields(lfs, ['perc_min', 'perc_max'])
+        if clipper in ('perc',):
+            lfs = remove_label_fields(lfs, ['std_min', 'std_max'])
+
     if label_format == 'full':
-        return ' '.join([f'{lf}-{get_val(row,lf)}' for lf in label_fields])
+        result = ' '.join([f'{lf}-{get_val(row,lf)}' for lf in lfs])
     elif label_format == 'empty':
-        return ' '.join([f'{get_val(row, lf)}' for lf in label_fields])
+        result = ' '.join([f'{get_val(row, lf)}' for lf in lfs])
     elif label_format == 'short':
-        return ' '.join([f'{get_tag(lf)}{get_val(row, lf)}' for lf in label_fields])
+        result = ' '.join([f'{get_tag(lf)}{get_val(row, lf)}' for lf in lfs])
     else:
         raise ValueError('label_format must be full empty or short')
+
+    return result
+
+    #if 'clipper' in label_fields:
+
 
 
 def get_labels(df: pd.DataFrame, label_fields: list[str], label_format: str):
@@ -212,9 +242,9 @@ def get_model_losses(dir_path, model, anomaly_class, model_name, prefix='val'):
 def get_all_losses(df, dir_path, prefix='val'):
     list_of_list_of_losses = []
     for i in range(df.shape[0]):
-        model = get_val(df.iloc[i], 'model')
+        model = get_val(df.iloc[i], 'model_class')
         anomaly_class = get_val(df.iloc[i], 'anomaly_class')
-        model_name = get_val(df.iloc[i], 'name')
+        model_name = get_val(df.iloc[i], 'model_name')
         list_of_list_of_losses.append(get_model_losses(dir_path, model, anomaly_class, model_name, prefix))
     return list_of_list_of_losses
 
@@ -270,9 +300,9 @@ def calc_losses_means_std(list_of_list_of_losses):
 
 
 def get_tag(field):
-    if field == 'model':  # no tag required
+    if field == 'model_class':  # no tag required
         return ''
-    if field == 'data':  # no tag required
+    if field == 'data_name':  # no tag required
         return ''
     elif field == 'filters':
         return 'f-'
@@ -300,6 +330,24 @@ def get_tag(field):
         return 'dr-'
     elif field == 'trainable_params':
         return 'pa-'
+    elif field == 'shuffle_patches':
+        return 'sptc-'
+    elif field == 'scale_per_image':
+        return 'spi-'
+    elif field == 'clip_per_image':
+        return 'cpi-'
+    elif field == 'clipper':
+        return 'clip-'
+    elif field == 'std_min':
+        return 'smi-'
+    elif field == 'std_max':
+        return 'sma-'
+    elif field == 'perc_min':
+        return 'pmi-'
+    elif field == 'perc_max':
+        return 'pma-'
+    elif field == 'final_activation':
+        return '' # 'fa-'
     else:
         return ''
 

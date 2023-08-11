@@ -20,4 +20,6 @@ from .channels import first_channels
 from .nln_processor import get_dists, combine, nln, get_dists_recon, get_normal_data, get_labels
 from .clipper import clip_std, clip_dyn_std, clip_known, clip
 from .preprocessor import preprocess, preprocess_all
-from .shuffler import shuffle
+from .shuffler import shuffle, unshuffle
+from .rfi_ratio import scaled_rfi_ratio, scaled_rfi_ratio_args, ratios_and_labels, rfi_ratio_split, rfi_ratio_indexes
+from .replace_zeros import replace_zeros_with_min

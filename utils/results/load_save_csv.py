@@ -4,13 +4,13 @@ import os
 
 
 def save_csv(data_name, seed, results_dict, output_path='./outputs', **kwargs):
-    # none_dict = empty_dict()
-    # save_dict = {**none_dict, **results_dict}
+
     save_dict = results_dict
     for k in save_dict.keys():
         save_dict[k] = str(save_dict[k])
-    # index = [i for i in range(len(save_dict))]
     save_df = pd.DataFrame([save_dict])
+
+    # save_df = pd.DataFrame([results_dict])
     if not os.path.exists(output_path):
         os.makedirs(output_path)
     file = os.path.join(output_path, 'results_{}_{}.csv'.format(data_name, seed))
@@ -22,9 +22,9 @@ def save_csv(data_name, seed, results_dict, output_path='./outputs', **kwargs):
         df.to_csv(file, index=False)
 
 
-def load_csv(dir_path='./outputs'):
+def load_csv(output_path='./outputs', **kwargs):
     """Loads every csv. Can filter it afterwards"""
-    glob_str = '{}/results_*_*.csv'.format(dir_path)
+    glob_str = '{}/results_*_*.csv'.format(output_path)
     files = glob.glob(glob_str)
     df_all = None
     for f in files:
@@ -34,6 +34,7 @@ def load_csv(dir_path='./outputs'):
             df = pd.read_csv(f)
             df_all = pd.concat([df_all, df], ignore_index=True)
     return df_all
+
 
 
 def empty_dict():

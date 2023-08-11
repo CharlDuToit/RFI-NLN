@@ -112,10 +112,10 @@ def main(cmd_args):
                 else:
                     model = [ae]
 
-                x_hat = infer(model[0], test_images, args, 'AE')
-                x_hat_train = infer(model[0], train_images, args, 'AE')
-                z_query = infer(model[0].encoder, test_images, args, 'encoder')
-                z = infer(model[0].encoder, train_images, args, 'encoder')
+                x_hat = infer_fcn(model[0], test_images, args, 'AE')
+                x_hat_train = infer_fcn(model[0], train_images, args, 'AE')
+                z_query = infer_fcn(model[0].encoder, test_images, args, 'encoder')
+                z = infer_fcn(model[0].encoder, train_images, args, 'encoder')
 
                 error = get_error('AE', test_images, x_hat, mean=False)
 

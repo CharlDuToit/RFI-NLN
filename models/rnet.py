@@ -55,24 +55,28 @@ def RNET_mesarcik(args):
     return model
 
 
-def RNET(input_shape, filters, dropout, kernel_regularizer, final_activation, **kwargs):
+def RNET(input_shape, filters, dropout, kernel_regularizer, activation, final_activation, bn_first, **kwargs):
     """
     Charl's reimplementation of Mesarcik's RNET
     """
     input_data = tf.keras.Input(input_shape, name='data')
+    if bn_first:
+        input_data = GenericBlock('b')(input_data)
     xp = layers.Conv2D(filters=filters, kernel_size=5, strides=(1, 1), padding='same')(input_data)
     x3 = GenericBlock('ba cba cbad p',
                       filters,
                       kernel_size=5,
+                      activation=activation,
                       strides=1,
                       dropout=dropout,
                       kernel_regularizer=kernel_regularizer)(xp, skip_tensor=xp)
     x7 = GenericBlock('cba cbad p',
                       filters,
                       kernel_size=5,
+                      activation=activation,
                       strides=1,
-                      dropout=dropout,
-                      kernel_regularizer=kernel_regularizer)(x3, skip_tensor=x3)
+                      kernel_regularizer=kernel_regularizer,
+                      dropout=dropout)(x3, skip_tensor=x3)
     # Mesarcic had kernel_size 5, Charl changed it back to 1
     # Mesarcic had relu as final activation, charl changed to sigmoid.
     # Paper 14 never mentions any activation function excpet RELU,
@@ -85,10 +89,19 @@ def RNET(input_shape, filters, dropout, kernel_regularizer, final_activation, **
                      filters,
                      kernel_size=5,
                      strides=1,
-                     activation='relu',
+                     activation=activation,
                      kernel_regularizer=kernel_regularizer)(x7)
     x = GenericBlock('ca', 1, kernel_size=1, strides=1, activation=final_activation)(x)
 
     model = tf.keras.Model(inputs=[input_data], outputs=[x])
+    return model
+
+def freeze_RNET(model: tf.keras.Model):
+    for i in range(len(model.layers)):
+        if hasattr(model.layers[i], 'trainable'):
+            model.layers[i].trainable = False
+    model.layers[-2].trainable = True # last conv
+    # model.layers[-4].trainable = True # last BN
+    model.layers[-5].trainable = True  # last BN
     return model
 

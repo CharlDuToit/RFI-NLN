@@ -1,6 +1,8 @@
 # import tensorflow as tf
-from tensorflow.keras import layers
-from tensorflow.math import scalar_mul
+from keras import layers
+import tensorflow as tf
+
+# from tensorflow.math import scalar_mul
 
 
 def resolve_generic_params(layer_chars, filters, kernel_size, strides, dilation_rate, dropout,
@@ -161,13 +163,17 @@ class GenericBlock:
                                                     activation_list,
                                                     kernel_regularizer_list):
                 for char in chars:
+                    kern_reg = None
+                    if kr == 'l2':
+                        kern_reg = tf.keras.regularizers.L2(l2=0.0001 / 2**level)  # default is 0.01
                     if char == 'c':
                         x = layers.Conv2D(filters=f * 2 ** level,
                                           kernel_size=k,
-                                          kernel_initializer='he_normal',
+                                          kernel_initializer='glorot_normal',  # 'he_normal',
                                           strides=s,
                                           dilation_rate=dr,
-                                          kernel_regularizer=kr,
+                                          # kernel_regularizer=kr,
+                                          kernel_regularizer=kern_reg,
                                           padding='same')(x)
                     if char == 'u':
                         x = layers.UpSampling2D(size=(2, 2))(x)  # perhaps use s instead of 2?
@@ -176,17 +182,22 @@ class GenericBlock:
                                                    kernel_size=k,
                                                    strides=s,
                                                    dilation_rate=dr,
-                                                   kernel_initializer='glorot_uniform',
-                                                   kernel_regularizer=kr,
+                                                   kernel_initializer='glorot_normal',
+                                                   # kernel_regularizer=kr,
+                                                   kernel_regularizer=kern_reg,
                                                    padding='same')(x)
                     if char == 'd':
                         if 0.0 < d < 1.0:
-                            x = layers.Dropout(d)(x)
+                            if a == 'selu':
+                                x = layers.AlphaDropout(d)(x)
+                            else:
+                                x = layers.Dropout(d)(x)
                     if char == 'a':
-                        x = layers.Activation(a)(x)
+                        if (a is not None) and (a != 'None'):
+                            x = layers.Activation(a)(x)
                     if char == 'm':
                         x = layers.MaxPooling2D((2, 2), strides=2)(x)  # perhaps use s instead of 2?
-                    # only first block can have merge with input tensor, otherwise ignore letters m p
+                    # only first block can have merge with input tensor, otherwise ignore letters n p
                     if skip_tensor is not None and b == 0:
                         if char == 'p':
                             x = layers.Add()([x, skip_tensor])
@@ -198,10 +209,11 @@ class GenericBlock:
                         x = layers.SeparableConv2D(filters=f * 2 ** level,
                                                    kernel_size=k,
                                                    depth_multiplier=1,
-                                                   kernel_initializer='he_normal',
+                                                   kernel_initializer='glorot_normal', # 'lecun_normal',  # 'he_normal',
                                                    strides=s,
                                                    dilation_rate=dr,
-                                                   depthwise_regularizer=kr,
+                                                   # kernel_regularizer=kr,
+                                                   kernel_regularizer=kern_reg,
                                                    padding='same')(x)
 
         return x
@@ -244,3 +256,60 @@ class GenericUnet:
 
         self.output_tensor = x
         return x
+
+
+class InceptionModuleBN(tf.keras.layers.Layer):
+    # 64 for 1x1 and 128 for 3x3, 5x5 and filters_pool
+    def __init__(self, filters_1x1, filters_3x3_reduce, filters_3x3, filters_5x5_reduce, filters_5x5, filters_pool):
+        super(InceptionModuleBN, self).__init__()
+
+        self.conv_1x1 = tf.keras.layers.Conv2D(filters_1x1, (1, 1), padding='same')
+        self.bn_1x1 = tf.keras.layers.BatchNormalization()
+        self.relu_1x1 = tf.keras.layers.ReLU()
+
+        self.conv_3x3_reduce = tf.keras.layers.Conv2D(filters_3x3_reduce, (1, 1), padding='same')
+        self.bn_3x3_reduce = tf.keras.layers.BatchNormalization()
+        self.relu_3x3_reduce = tf.keras.layers.ReLU()
+        self.conv_3x3 = tf.keras.layers.Conv2D(filters_3x3, (3, 3), padding='same')
+        self.bn_3x3 = tf.keras.layers.BatchNormalization()
+        self.relu_3x3 = tf.keras.layers.ReLU()
+
+        self.conv_5x5_reduce = tf.keras.layers.Conv2D(filters_5x5_reduce, (1, 1), padding='same')
+        self.bn_5x5_reduce = tf.keras.layers.BatchNormalization()
+        self.relu_5x5_reduce = tf.keras.layers.ReLU()
+        self.conv_5x5 = tf.keras.layers.Conv2D(filters_5x5, (5, 5), padding='same')
+        self.bn_5x5 = tf.keras.layers.BatchNormalization()
+        self.relu_5x5 = tf.keras.layers.ReLU()
+
+        self.maxpool = tf.keras.layers.MaxPooling2D((3, 3), strides=(1, 1), padding='same')
+        self.conv_pool = tf.keras.layers.Conv2D(filters_pool, (1, 1), padding='same')
+        self.bn_pool = tf.keras.layers.BatchNormalization()
+        self.relu_pool = tf.keras.layers.ReLU()
+
+    def call(self, inputs):
+        conv_1x1 = self.conv_1x1(inputs)
+        bn_1x1 = self.bn_1x1(conv_1x1)
+        relu_1x1 = self.relu_1x1(bn_1x1)
+
+        conv_3x3_reduce = self.conv_3x3_reduce(inputs)
+        bn_3x3_reduce = self.bn_3x3_reduce(conv_3x3_reduce)
+        relu_3x3_reduce = self.relu_3x3_reduce(bn_3x3_reduce)
+        conv_3x3 = self.conv_3x3(relu_3x3_reduce)
+        bn_3x3 = self.bn_3x3(conv_3x3)
+        relu_3x3 = self.relu_3x3(bn_3x3)
+
+        conv_5x5_reduce = self.conv_5x5_reduce(inputs)
+        bn_5x5_reduce = self.bn_5x5_reduce(conv_5x5_reduce)
+        relu_5x5_reduce = self.relu_5x5_reduce(bn_5x5_reduce)
+        conv_5x5 = self.conv_5x5(relu_5x5_reduce)
+        bn_5x5 = self.bn_5x5(conv_5x5)
+        relu_5x5 = self.relu_5x5(bn_5x5)
+
+        maxpool = self.maxpool(inputs)
+        convpool = self.conv_pool(maxpool)
+        bn_pool = self.bn_pool(convpool)
+        relu_pool = self.relu_pool(bn_pool)
+
+        output = tf.keras.layers.concatenate([relu_1x1, relu_3x3, relu_5x5, relu_pool], axis=-1)
+
+        return output

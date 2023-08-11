@@ -1,0 +1,18 @@
+filing:
+  outdir: '.'
+  outfile_name: './outfile' 
+  output_format: 'uvh5'
+  clobber: True
+freq:
+  Nfreqs: 512
+  channel_width: 97656.25
+  start_freq: 100000000 # 107000000
+#sources:
+#  catalog: './gleam_top50.skyh5'
+telescope:
+  array_layout: './hex_array.csv'
+  telescope_config_name: './telescope_config_hera_airy.yaml'
+time:
+  Ntimes: 512
+  integration_time: 3.512
+  start_time: 2457458.1738949567

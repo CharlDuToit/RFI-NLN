@@ -61,6 +61,7 @@ def num_patches_per_image(image_shape, patch_x, patch_y, **kwargs):
     else:
         raise ValueError('image_shape has wrong number of dimensions')
 
+
 def get_multichannel_patches(data_or_masks, patch_x, patch_y, patch_stride_x, patch_stride_y, **kwargs):
     """
 

@@ -14,11 +14,11 @@ function execute (input)
   -- { 'I', 'Q' } to flag only on Stokes I and Q
   local flag_polarizations = input:get_polarizations()
 
-  local   base_threshold = 10.0  -- lower means more sensitive detection
-  local iteration_count = 3  -- slowly increase sensitivity: how many iterations to do this?
-  local threshold_factor_step = 2.0 -- How much to increase the sensitivity each iteration?
-  local frequency_resize_factor = 1 -- Amount of "extra" smoothing in frequency direction
-  local transient_threshold_factor = 100 -- decreasing this value puts more emphasis on detection of transient RFI
+  local   base_threshold = 10.0  -- lower means more sensitive detection 10.0  10.0
+  local iteration_count = 3 -- slowly increase sensitivity: how many iterations to do this? 3 2
+  local threshold_factor_step = 2.0 -- How much to increase the sensitivity each iteration? 2.0 2.0
+  local frequency_resize_factor = 1 -- Amount of "extra" smoothing in frequency direction 1 1, 2 worse
+  local transient_threshold_factor = 100 -- decreasing this value puts more emphasis on detection of transient RFI 100 100, makes no diff
   -- How to flag complex values, options are: phase, amplitude, real, imaginary, complex
   local flag_representations = { "amplitude" }
  
@@ -124,7 +124,7 @@ function execute (input)
     aoflagger.set_progress(ipol, #flag_polarizations )
   end -- end of polarization iterations
 
-  --  aoflagger.scale_invariant_rank_operator_masked(input, copy_of_input, 0.2, 0.2)
+  -- aoflagger.scale_invariant_rank_operator_masked(input, copy_of_input, 0.2, 0.2)
 
   if(input:has_metadata()) then
     aoflagger.collect_statistics(input, copy_of_input)

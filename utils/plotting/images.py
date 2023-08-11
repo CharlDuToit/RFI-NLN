@@ -7,10 +7,113 @@ import numpy as np
 #import pandas as pd
 
 
+def save_image_masks_batches(dir_path, data, masks, batch_size=20, figsize=(20, 60)):
+    for i in range(0, len(data), batch_size):
+        strt = i
+        fnsh = np.minimum(strt + batch_size, len(data))
+        d = data[strt:fnsh, ..., 0]
+        m = masks[strt:fnsh, ..., 0]
+
+        fig, ax = plt.subplots(len(d), 2, figsize=figsize)
+
+        ax[0, 0].title.set_text('Input')
+        ax[0, 1].title.set_text('True Mask')
+        for j in range(len(d)):
+            ax[j, 0].imshow(d[j])
+            ax[j, 1].imshow(m[j])
+
+        plt.tight_layout()
+        if not os.path.exists(dir_path):
+            os.makedirs(dir_path)
+
+        fig.savefig(os.path.join(dir_path, f'image_masks_{strt}'))
+
+        plt.close('all')
+
+
+def save_image_batches_grid(dir_path, data, grid_size=10, figsize=(50, 50)):
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+
+    for i in range(0, len(data), grid_size*grid_size):
+        strt = i
+        fnsh = np.minimum(strt + grid_size*grid_size, len(data))
+
+        if data.shape[-1] in (1, 2):
+            d = data[strt:fnsh, ..., 0]
+        else:
+            d = data[strt:fnsh, ...]
+
+        fig, ax = plt.subplots(grid_size, grid_size, figsize=figsize)
+
+        # ax[0].title.set_text('Input')
+        for j in range(len(d)):
+            ax[j // grid_size, j % grid_size].imshow(d[j])
+
+        plt.tight_layout()
+
+        fig.savefig(os.path.join(dir_path, f'image_{strt}'))
+
+        plt.close('all')
+
+
+def save_image_batches(dir_path, data, batch_size=20, figsize=(20, 60)):
+    for i in range(0, len(data), batch_size):
+        strt = i
+        fnsh = np.minimum(strt + batch_size, len(data))
+
+        if data.shape[-1] in (1, 2):
+            d = data[strt:fnsh, ..., 0]
+        else:
+            d = data[strt:fnsh, ...]
+
+        fig, ax = plt.subplots(len(d), 1, figsize=figsize)
+
+        ax[0].title.set_text('Input')
+        for j in range(len(d)):
+            ax[j].imshow(d[j])
+
+        plt.tight_layout()
+        if not os.path.exists(dir_path):
+            os.makedirs(dir_path)
+
+        fig.savefig(os.path.join(dir_path, f'image_{strt}'))
+
+        plt.close('all')
+
+
+def save_data_masks(dir_path, data, true_masks, figsize=(10, 20)):
+    # masks_inferred = self.infer(data)
+    fig, ax = plt.subplots(len(data), 2, figsize=figsize)
+
+    if len(data) == 1:
+        ax[0].title.set_text('Input')
+        ax[1].title.set_text('True Mask')
+        ax[0].imshow(data[0, ..., 0])
+        ax[1].imshow(true_masks[0, ..., 0])
+    else:
+        ax[0, 0].title.set_text('Input')
+        ax[0, 1].title.set_text('True Mask')
+        for i in range(len(data)):
+            ax[i, 0].imshow(data[i, ..., 0])
+            ax[i, 1].imshow(true_masks[i, ..., 0])
+
+    plt.tight_layout()
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+
+    fig.savefig('{}/data_true_masks_image.png'.format(dir_path))
+
+    plt.close('all')
+
 
 def save_data_inferred(dir_path, data, masks_inferred, thresh=-1, figsize=(10,20)):
     # masks_inferred = self.infer(data)
     fig, ax = plt.subplots(len(data), 2, figsize=figsize)
+
+    if 0.0 < thresh < 1.0:
+        masks_inferred = masks_inferred > thresh
+
     if len(data) == 1:
         ax[0].title.set_text('Input')
         ax[1].title.set_text('Mask Inferred')
@@ -35,9 +138,12 @@ def save_data_inferred(dir_path, data, masks_inferred, thresh=-1, figsize=(10,20
 
     plt.close('all')
 
-def save_data_masks_inferred(dir_path, data, masks, masks_inferred, epoch=-1, thresh=-1, figsize=(10, 20)):
+def save_data_masks_inferred(dir_path, data, masks, masks_inferred, epoch=-1, thresh=-1, model_type=None, figsize=(10, 20)):
     # masks_inferred = self.infer(data)
     fig, ax = plt.subplots(len(data), 4, figsize=figsize)
+
+    if 0.0 < thresh < 1.0:
+        masks_inferred = masks_inferred > thresh
 
     if len(data) == 1:
         ax[0].title.set_text('Input')
@@ -62,17 +168,82 @@ def save_data_masks_inferred(dir_path, data, masks, masks_inferred, epoch=-1, th
             ax[i, 3].imshow(np.absolute(masks[i, ..., 0] - masks_inferred[i, ..., 0]))
 
     plt.tight_layout()
+
+    if not model_type:
+        model_type = ''
+    else:
+        model_type += '_'
+
     if not os.path.exists(os.path.join(dir_path, 'epochs')):
         os.makedirs(os.path.join(dir_path, 'epochs'))
     if epoch > -1:
-        fig.savefig('{}/epochs/epoch_{:04d}_image.png'.format(dir_path, epoch))
+        fig.savefig('{}/epochs/{}epoch_{:04d}_image.png'.format(dir_path, model_type, epoch))
     else:
         if 0.0 < thresh < 1.0:
-            fig.savefig('{}/data_masks_image_thresh_{:.2f}.png'.format(dir_path, thresh))
+            fig.savefig('{}/{}data_masks_image_thresh_{:.2f}.png'.format(dir_path, model_type, thresh))
         else:
-            fig.savefig('{}/data_masks_image.png'.format(dir_path))
+            fig.savefig('{}/{}data_masks_image.png'.format(dir_path, model_type))
 
     plt.close('all')
+
+
+def save_data_cells_boundingboxes(dir_path, data, cells, cells_inferred, epoch=-1, thresh=0.25, model_type=None, figsize=(10, 20)):
+    from utils import images_cells_to_images_bounding_boxes, draw_images_bounding_boxes
+    # from utils import draw_images_bounding_boxes, images_cells_to_images_bounding_boxes_v3
+
+    # true_cells = unnormalize_images_cells(data.shape[1:], cells)
+    # pred_cells = unnormalize_images_cells(data.shape[1:], cells_inferred)
+
+    true_bboxes = images_cells_to_images_bounding_boxes(data.shape[1:], cells, thresh)
+    pred_bboxes = images_cells_to_images_bounding_boxes(data.shape[1:], cells_inferred, thresh)
+
+    # true_bboxes = images_cells_to_images_bounding_boxes_v3(data.shape[1:], cells, 0.25)
+    # pred_bboxes = images_cells_to_images_bounding_boxes_v3(data.shape[1:], cells_inferred, 0.25)
+
+    empty_im = np.zeros(data.shape)
+    true_images = draw_images_bounding_boxes(empty_im, true_bboxes)
+    pred_images = draw_images_bounding_boxes(empty_im, pred_bboxes)
+
+    # masks_inferred = self.infer(data)
+    fig, ax = plt.subplots(len(data), 3, figsize=figsize)
+
+    if len(data) == 1:
+        ax[0].title.set_text('Input')
+        ax[1].title.set_text('True Bounding boxes')
+        ax[2].title.set_text('Inferred Bounding boxes')
+        ax[0].imshow(data[0, ..., 0])
+        ax[1].imshow(true_images[0, ...])
+        ax[2].imshow(pred_images[0, ...])
+
+    else:
+        ax[0, 0].title.set_text('Input')
+        ax[0, 1].title.set_text('True Bounding boxes')
+        ax[0, 2].title.set_text('Inferred Bounding boxes')
+
+        for i in range(len(data)):
+            ax[i, 0].imshow(data[i, ..., 0])
+            ax[i, 1].imshow(true_images[i, ...])
+            ax[i, 2].imshow(pred_images[i, ...])
+
+    plt.tight_layout()
+
+    if not model_type:
+        model_type = ''
+    else:
+        model_type += '_'
+
+    if not os.path.exists(os.path.join(dir_path, 'epochs')):
+        os.makedirs(os.path.join(dir_path, 'epochs'))
+    if epoch > -1:
+        fig.savefig('{}/epochs/{}epoch_{:04d}_image.png'.format(dir_path, model_type, epoch))
+    else:
+        if 0.0 < thresh < 1.0:
+            fig.savefig('{}/{}data_masks_image_thresh_{:.2f}.png'.format(dir_path, model_type, thresh))
+        else:
+            fig.savefig('{}/{}data_masks_image.png'.format(dir_path, model_type))
+
+    plt.close('all')
+
 
 
 def save_data_inferred_ae(dir_path, data, data_inferred, epoch=-1):
