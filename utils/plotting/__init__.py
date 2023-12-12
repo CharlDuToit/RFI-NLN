@@ -4,7 +4,9 @@ import sys
 sys.path.insert(1, '../..')
 
 from .images import (  # save_epochs_curve,
+    save_waterfall,
     generate_and_save_images,
+    save_image_masks_masksinferred_batches,
     # save_training_curves,
     save_data_masks_inferred,
     save_data_inferred_ae,
@@ -25,3 +27,5 @@ from .scatter_gmm import save_scatter_gmm
 from .common import apply_plot_settings
 from .recall_prec import save_recall_prec_curve
 from .fpr_tpr import save_fpr_tpr_curve
+from .bar import save_bar
+from .confusion_image import save_confusion_image

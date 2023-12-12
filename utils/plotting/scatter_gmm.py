@@ -9,14 +9,15 @@ from typing import Tuple, List
 from .common import apply_plot_settings
 
 
-def save_scatter_gmm(df: pd.DataFrame, groupby: Tuple[str, ...], x_axis: str, y_axis: str, figsize=(10, 10), size=10,
+def save_scatter_gmm(df: pd.DataFrame, groupby: Tuple[str, ...], x_axis: str, y_axis: str, figsize=(20, 15), size=10,
                      hatch_ellipse: bool = False, line_ellipse: bool = False, means: bool = True, points: bool = True,
                      legend_titles: Tuple = None,
-                     file_name='test', title=None, xlim_top=None, xlim_bottom=None, ylim_top=None, ylim_bottom=None,
+                     file_name='test', title=None, grid=True, xlim_top=None, xlim_bottom=None, ylim_top=None, ylim_bottom=None,
                      dir_path='./', show=False, show_legend=False, logx=False, logy=False, xlabel=None, ylabel=None,
-                     axis_fontsize=20, xtick_size=20, ytick_size=20, legend_fontsize=20, title_fontsize=20,
+                     axis_fontsize=55, xtick_size=55, ytick_size=55, legend_fontsize=55, title_fontsize=55,
                      linewidth=10, layout_rect=None, color_legend_bbox=None, line_legend_bbox=None,
                      mean_size_factor=3, marker_legend_bbox=None, legendspacing=None, legend_borderpad=None,
+                     include_legend_titles=True,
                      **kwargs):
     fig, ax = plt.subplots(figsize=figsize)
 
@@ -53,7 +54,10 @@ def save_scatter_gmm(df: pd.DataFrame, groupby: Tuple[str, ...], x_axis: str, y_
     if show_legend:
         if len(groupby) >= 1:
             color_legend_handles = []
-            tit = legend_titles[0] if legend_titles and len(legend_titles) >= 1 else groupby[0]
+            if include_legend_titles:
+                tit = legend_titles[0] if legend_titles and len(legend_titles) >= 1 else groupby[0]
+            else:
+                tit = None
             for k in unique_colors.keys():
                 color_legend_handles.append(
                     ax.scatter([], [], s=size * mean_size_factor, color=colors[unique_colors[k]], label=k))
@@ -61,9 +65,9 @@ def save_scatter_gmm(df: pd.DataFrame, groupby: Tuple[str, ...], x_axis: str, y_
             #color_legend = ax.legend(handles=color_legend_handles, title=tit, loc='center left',
             #                         bbox_to_anchor=(1, 0.85), fontsize=legend_fontsize, title_fontsize=legend_fontsize)
             # Fontsize 60 L1: figsize (20,20) all models, each loss, all reg
-            bbox = color_legend_bbox if color_legend_bbox else (1, 0.85)
+            bbox = color_legend_bbox # if color_legend_bbox else (1, 0.85)
 
-            color_legend = ax.legend(handles=color_legend_handles, title=tit, loc='center left',
+            color_legend = ax.legend(handles=color_legend_handles, title=tit, loc='upper left',
                                      bbox_to_anchor=bbox, fontsize=legend_fontsize,
                                      labelspacing=legendspacing,
                                      title_fontsize=legend_fontsize,
@@ -74,7 +78,10 @@ def save_scatter_gmm(df: pd.DataFrame, groupby: Tuple[str, ...], x_axis: str, y_
 
         if line_ellipse and len(groupby) >= 2:
             line_legend_handles = []
-            tit = legend_titles[1] if legend_titles and len(legend_titles) >= 2 else groupby[1]
+            if include_legend_titles:
+                tit = legend_titles[1] if legend_titles and len(legend_titles) >= 2 else groupby[1]
+            else:
+                tit = None
             for k in unique_lines.keys():
                 line_legend_handles.append(
                     ax.plot([], [], color='black', linewidth=linewidth, linestyle=line_types[unique_lines[k]], label=k)[
@@ -88,7 +95,10 @@ def save_scatter_gmm(df: pd.DataFrame, groupby: Tuple[str, ...], x_axis: str, y_
 
         if len(groupby) >= 2:
             marker_legend_handles = []
-            tit = legend_titles[1] if legend_titles and len(legend_titles) >= 2 else groupby[1]
+            if include_legend_titles:
+                tit = legend_titles[1] if legend_titles and len(legend_titles) >= 2 else groupby[1]
+            else:
+                tit = None
             for k in unique_markers.keys():
                 marker_legend_handles.append(
                     ax.scatter([], [], color='black', s=size * mean_size_factor, marker=marker_types[unique_markers[k]],
@@ -103,7 +113,10 @@ def save_scatter_gmm(df: pd.DataFrame, groupby: Tuple[str, ...], x_axis: str, y_
 
         if len(groupby) >= 3:
             hatch_legend_handles = []
-            tit = legend_titles[2] if legend_titles and len(legend_titles) >= 3 else groupby[2]
+            if include_legend_titles:
+                tit = legend_titles[2] if legend_titles and len(legend_titles) >= 3 else groupby[2]
+            else:
+                tit = None
             for k in unique_hatch.keys():
                 hatch_legend_handles.append(ax.add_patch(
                     Ellipse((0, 0), 0, 0, edgecolor='black', facecolor='white', hatch=hatches[unique_hatch[k]],
@@ -175,25 +188,21 @@ def save_scatter_gmm(df: pd.DataFrame, groupby: Tuple[str, ...], x_axis: str, y_
             eigenvalues, eigenvectors = np.linalg.eigh(cov)
             angle = np.degrees(np.arctan2(eigenvectors[0, 1], eigenvectors[0, 0]))
             width, height = 2 * np.sqrt(2 * eigenvalues)
+            #if group_keys != 'aof':
+            #    width = width / 3.5
             ellipse = Ellipse(xy=mean, width=width, height=height, angle=angle,
                               edgecolor=edgecolor, linestyle=linestyle, linewidth=linewidth,
                               facecolor=facecolor, hatch=hatch_pattern)
             ax.add_patch(ellipse)
 
-    # plt.tight_layout(rect=(0.06, 0.6, 0.85, 0.95))
-    if layout_rect:
-        plt.tight_layout(rect=layout_rect)
-    elif show_legend:
-        # fontsize 30
-        # plt.tight_layout(rect=(0.06, 0.06, 0.75, 0.95))
-        # fontsize 60
-        plt.tight_layout(rect=(0.08, 0.08, 0.7, 0.95))
-    else:
-        plt.tight_layout(rect=(0.11, 0.11, 0.96, 0.98))
+    #     plt.tight_layout(rect=(0.11, 0.11, 0.96, 0.98))
     # increase: more left space
     # increase: more bottom space
     # decrease: more right space
+    # decreate: more top space
     apply_plot_settings(fig, ax,
+                        grid=grid,
+                        layout_rect=layout_rect,
                         xlim_top=xlim_top,
                         xlim_bottom=xlim_bottom,
                         ylim_top=ylim_top,

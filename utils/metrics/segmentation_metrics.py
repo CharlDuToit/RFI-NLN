@@ -32,6 +32,23 @@ def aof_recall_precision_f1_fpr(y_true, y_pred):
 
     return recall_, precision_, f1_, fpr
 
+def recall_prec_f1_fpr_tn_fp_fn_fp(y_true, y_pred):
+    """
+    y is flattened
+    """
+    # aconf_mat[0,0] = # TN
+    # conf_mat[0, 1] = # FP
+    # conf_mat[1, 0] = # FN
+    # conf_mat[1,1] =  # TP
+
+    tn, fp, fn, tp = confusion_matrix(y_true, y_pred >= 0.5).ravel()
+    recall_ = tp / (tp + fn)
+    precision_ = tp / (tp + fp) if tp+fp > 0.0 else 0.0
+    fpr = fp / (tn + fp)
+    f1_ = 2 * precision_ * recall_ / (precision_ + recall_)
+
+    return recall_, precision_, fpr, f1_, tn, fp, fn, tp
+
 
 def recall(y_true, y_pred, threshold=0.5):
     return recall_score(y_true.flatten(), y_pred.flatten() > threshold)
@@ -61,12 +78,15 @@ def auprc(y_true, y_pred):
 
 def fpr_tpr_vals(y_true, y_pred):
     fpr, tpr, thr = roc_curve(y_true.flatten() > 0, np.round(y_pred.flatten(), 3))
+    #fpr, tpr, thr = roc_curve(y_true.flatten() > 0, y_pred.flatten())
+
     return fpr, tpr, thr
     # return auc(fpr, tpr)
 
 
 def prec_recall_vals(y_true, y_pred):
     precision, recall, thresholds = precision_recall_curve(y_true.flatten() > 0, np.round(y_pred.flatten(), 3))
+    #precision, recall, thresholds = precision_recall_curve(y_true.flatten() > 0, y_pred.flatten())
     return precision, recall, thresholds
     # return auc(recall, precision)
 

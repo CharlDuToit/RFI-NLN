@@ -28,6 +28,41 @@ def common_gmm_options(fontsize=60, **plot_kwargs):
     )
     return {**plot_options, **plot_kwargs}
 
+def common_bar_options(fontsize=55, **plot_kwargs):
+    plot_options=dict(
+        column_name=None,
+        group_1=None,
+        group_2=None,
+        group_3=None,
+        show_legend=True,
+        show=False,
+        linewidth=3,
+        title_fontsize=fontsize,
+        legend_fontsize=fontsize,
+        axis_fontsize=fontsize,
+        ytick_size=fontsize,
+        figsize=(20, 15),
+        color_legend_bbox=None,
+        hatch_legend_bbox=None,
+        mean_size_factor=3,
+        layout_rect=(0.09, 0.01, 0.98, 0.98),
+        bar_width=0.3,
+        annotate_group_2=False,
+        annotate_group_2_mean=False,
+        show_group_2_legend=True,
+        show_group_3_legend=True,
+        mean_fontsize=52,
+        annotate_fontsize=52,
+        legendspacing=0,
+        legend_borderpad=0,
+        ylim_top=None,
+        ylim_bottom=None,
+        title=None,
+        ylabel=None,
+        plot_min_max=True,
+    )
+    return {**plot_options, **plot_kwargs}
+
 
 def common_recall_prec_options(fontsize=60, **plot_kwargs):
     plot_options=dict(
@@ -46,6 +81,7 @@ def common_recall_prec_options(fontsize=60, **plot_kwargs):
         size=120,
         linewidth=3,
         title_fontsize=fontsize,
+        contour_fontsize=fontsize,
         legend_fontsize=fontsize,
         axis_fontsize=fontsize,
         xtick_size=fontsize,

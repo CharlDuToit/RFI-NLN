@@ -94,7 +94,7 @@ def get_labels(labels_, sizes_, label_on_point, size_on_point, num_points):
 def save_bubble(x_vals, y_vals, labels=None, sizes=None, label_on_point=True, size_on_point=True, size_legend=True,
                 point_label_size=20, size_min=100, size_max=550, legendspacing=2, figsize=(20,10),
                 logx=False, logy=False, dir_path='./', file_name='bubble', xlabel='x-axis', ylabel='y-axis', title=None,
-                legend_title=None, xlim_top=None, xlim_bottom=None, ylim_top=None, ylim_bottom=None, show=False,
+                legend_title=None, grid=True, xlim_top=None, xlim_bottom=None, ylim_top=None, ylim_bottom=None, show=False,
                 axis_fontsize=20, xtick_size=20, ytick_size=20, legend_fontsize=20, title_fontsize=20,
                 size_legend_title='Parameters', legend_size_labels=((5, 'Five'),(10, 'Ten')),
                 layout_rect=None, legend_bbox=None, adjustment_set=1, **kwargs):
@@ -139,54 +139,76 @@ def save_bubble(x_vals, y_vals, labels=None, sizes=None, label_on_point=True, si
 
     for x, y, label, point_label, s in zip(x_vals, y_vals, labels_, point_labels, plot_sizes):
         ax.scatter(x, y, s=s, label=label)
-        if adjustment_set == 1:
+        if adjustment_set == 3:  # MNRAS
+            if point_label == 'U':
+                x = x * 0.95
+                y = y + 0.004
+            if point_label == 'RFI':
+                x = x * 0.95
+            if point_label == 'DUAL':
+                y = y + 0.005
+            if point_label == 'AC':
+                y = y - 0.01
+        if adjustment_set == 1: # LOFAR
             if point_label == 'U' and logx:  # TEMPORARY
                 x = x * 0.95
             if point_label == 'RFI' and logx:  # TEMPORARY
                 x = x * 0.94
-            if point_label == 'R5': # TEMPORARY
+            if point_label == 'RFI':
+                if not logx and xlabel != 'Validation FPR' and xlabel != 'Test FPR':  # TEMPORARY
+                    x = x - 0.005
+                if not logx and (xlabel == 'Validation FPR' or xlabel == 'Test FPR'):  # TEMPORARY
+                    x = x - 0.00003
+            if point_label == 'R5' and ylabel != 'Test FPR': # TEMPORARY
                 y = y - 0.0001
-            if point_label == 'DSC_DUAL_RESUNET' and not logx:  # TEMPORARY
-                x = x - 0.01
-            if point_label == 'AC' and not logx:  # TEMPORARY
+            if point_label == 'DUAL' and not logx and xlabel != 'Validation FPR' and xlabel != 'Test FPR':  # TEMPORARY
+                x = x - 0.003
+            if point_label == 'AC' and not logx and xlabel != 'Validation FPR' and xlabel != 'Test FPR':  # TEMPORARY
                 x = x - 0.0028
             if point_label == 'ASPP' and not logx:  # TEMPORARY
+
                 if xlabel == 'Validation AUROC':
-                    x = x - 0.0023
+                    x = x - 0.0083
                 if xlabel == 'Validation AUPRC':
-                    x = x - 0.007
+                    x = x - 0.011
                 if ylabel == 'Test AUROC':
                     y = y + 0.001
         if adjustment_set == 2:
-            if point_label == 'U' and logx:  # TEMPORARY
-                x = x * 0.95
-            if point_label == 'U' and not logx:
-                x = x - 0.0008
-            if point_label == 'U':
-                y = y - 0.0013
-            if point_label == 'RFI' and logx:  # TEMPORARY
-                x = x * 0.94
-            if point_label == 'RFI' and not logx:  # TEMPORARY
-                x = x -  0.001
-            if point_label == 'R5': # TEMPORARY
-                y = y + 0.0001
-                if logx:
-                    x = x*0.9
-            if point_label == 'DSC_DUAL_RESUNET' and not logx:  # TEMPORARY
-                x = x - 0.01
-            if point_label == 'AC' and not logx:  # TEMPORARY
-                x = x - 0.0008
-            if point_label == 'AC':
-                y = y - 0.0017
-            if point_label == 'ASPP' and not logx:  # TEMPORARY
-                if xlabel == 'Validation AUROC':
-                    x = x - 0.0023
-                if xlabel == 'Validation AUPRC':
-                    x = x + 0.0004
-                    y = y - 0.0011
-                if ylabel == 'Test AUROC':
-                    x = x + 0.0024
-                    y = y - 0.0011
+            if xlabel != 'Validation AUROC':
+                if point_label == 'U' and logx:  # TEMPORARY
+                    x = x * 0.95
+                if point_label == 'U' and not logx and xlabel != 'Validation FPR' and xlabel != 'Test FPR':
+                    x = x - 0.0008
+                if point_label == 'U':
+                    y = y - 0.001
+                if point_label == 'RFI' and logx:  # TEMPORARY
+                    x = x * 0.94
+                if point_label == 'RFI' and not logx and xlabel != 'Validation FPR' and xlabel != 'Test FPR':  # TEMPORARY
+                    x = x -  0.001
+                if point_label == 'R5' and ylabel != 'Validation FPR' and ylabel != 'Test FPR': # TEMPORARY
+                    y = y + 0.0001
+                    if logx:
+                        x = x*0.9
+                    elif xlabel != 'Validation FPR' and xlabel != 'Test FPR':
+                        x = x - 0.0008
+                if point_label == 'DSC_DUAL_RESUNET' and not logx and xlabel != 'Validation FPR' and xlabel != 'Test FPR':  # TEMPORARY
+                    x = x - 0.01
+                if point_label == 'AC' and not logx and xlabel != 'Validation FPR' and xlabel != 'Test FPR':  # TEMPORARY
+                    x = x - 0.0008
+                if point_label == 'AC' and ylabel != 'Validation FPR' and ylabel != 'Test FPR':
+                    y = y - 0.0017
+                if point_label == 'ASPP' and not logx and (xlabel == 'Validation FPR' or xlabel == 'Test FPR'):  # TEMPORARY
+                    if xlabel == 'Test FPR':
+                        x = x - 0.5e-5
+                if point_label == 'ASPP' and not logx and xlabel != 'Validation FPR' and xlabel != 'Test FPR':  # TEMPORARY
+                    if xlabel == 'Validation AUROC':
+                        x = x - 0.0023
+                    if xlabel == 'Validation AUPRC':
+                        x = x + 0.0004
+                        y = y - 0.0011
+                    if ylabel == 'Test AUROC':
+                        x = x + 0.0024
+                        y = y - 0.0011
         ax.annotate(point_label, (x, y), fontsize=point_label_size)
 
     if labels is not None and label_on_point is False:
@@ -202,25 +224,10 @@ def save_bubble(x_vals, y_vals, labels=None, sizes=None, label_on_point=True, si
         ax.legend(handles=handles,labelspacing=legendspacing, title=size_legend_title, fontsize=legend_fontsize,
                   title_fontsize=legend_fontsize, bbox_to_anchor=bbox)
 
-        # color_legend = ax.legend(handles=color_legend_handles, title=tit, loc='center left',
-        #                          bbox_to_anchor=bbox, fontsize=legend_fontsize, title_fontsize=legend_fontsize)
-        # line1 = temp_ax.scatter(0, 0, c='white', edgecolors='black', s=rescale_with_args(5, sub, mul, size_min), label='5')
-        # line2 = temp_ax.scatter(0, 0, c='white', edgecolors='black', s=rescale_with_args(10, sub, mul, size_min), label='10')
-        # ax.legend(handles=[line2,line1],labelspacing=legendspacing, title=size_legend_title, fontsize=legend_fontsize, title_fontsize=legend_fontsize)
-
-        # line1 = temp_ax.scatter(0, 0, c='white', edgecolors='black', s=rescale_with_args(5e5, sub, mul, size_min), label='500k')
-        # line2 = temp_ax.scatter(0, 0, c='white', edgecolors='black', s=rescale_with_args(2.5e6, sub, mul, size_min), label='2.5M')
-        # line3 = temp_ax.scatter(0, 0, c='white', edgecolors='black', s=rescale_with_args(5e6, sub, mul, size_min), label='5M')
-        # line4 = temp_ax.scatter(0, 0, c='white', edgecolors='black', s=rescale_with_args(15e6, sub, mul, size_min), label='   15M')
-        #ax.legend(handles=[line4,line3,line2,line1],labelspacing=2, title='   Parameters   ', fontsize=legend_size, title_fontsize=legend_size)
-        # ax.set_xlim(right=4e11) # this line might throw away all ticks for some reason
-
-    if layout_rect:
-        fig.tight_layout(rect=layout_rect)
-    else:
-        fig.tight_layout()
 
     apply_plot_settings(fig, ax,
+                        grid=grid,
+                        layout_rect=layout_rect,
                         xlim_top=xlim_top,
                         xlim_bottom=xlim_bottom,
                         ylim_top=ylim_top,
@@ -241,28 +248,6 @@ def save_bubble(x_vals, y_vals, labels=None, sizes=None, label_on_point=True, si
                         legend_title=None,
                         show=show)
 
-    # if title is not None:
-    #     ax.set_title(title, fontsize=axis_fontsize)
-    # if logx:
-    #     ax.set_xscale('log')
-    # if logy:
-    #     ax.set_yscale('log')
-    # ax.set_xlabel(xlabel, fontsize=axis_fontsize)
-    # ax.tick_params(axis='x', labelsize=xtick_size, which='minor')
-    # ax.tick_params(axis='x', labelsize=xtick_size, which='major')
-    # ax.set_ylabel(ylabel, fontsize=axis_fontsize)
-    # ax.tick_params(axis='y', labelsize=ytick_size, which='minor')
-    # ax.tick_params(axis='y', labelsize=ytick_size, which='major')
-    #
-    # if not os.path.exists(dir_path):
-    #     os.makedirs(dir_path)
-    # if len(file_name) < 4 or file_name[-4:] != '.png':
-    #     file_name += '.png'
-    # file = os.path.join(dir_path, f'{file_name}')
-    #
-    # fig.savefig(file)
-    #
-    # plt.close('all')
 
 
 if __name__ == '__main__':

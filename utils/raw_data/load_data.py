@@ -24,5 +24,6 @@ def load_raw_data(data_path, data_name, rfi=None, lofar_subset='full', **kwargs)
         raise ValueError(f'data_name {data_name} not supported')
 
     print(f'Data load time: {time.time() - start} sec')
+    print(f'Test Data Shape: {test_masks.shape}')
     return train_data, train_masks, test_data, test_masks
 

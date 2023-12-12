@@ -30,6 +30,8 @@ parser.add_argument('-model_class', metavar='-m', type=str, default='AE',
 parser.add_argument('-task', metavar='-t', type=str, default='train',
                     choices={'train', 'eval', 'eval_test', 'infer', 'transfer_train'},
                     help='Task to perform')
+parser.add_argument('-fold', metavar='-fld', type=int, default=-1,
+                    help='The fold number 0..4')
 parser.add_argument('-freeze_top_layers', metavar='-ftl', type=str2bool, default=False,
                     help='Freeze top 2 layers?')
 parser.add_argument('-cmd_args', metavar='-cmdargs', type=str, nargs='+', default=['data_path', 'data_name'],

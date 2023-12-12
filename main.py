@@ -15,7 +15,7 @@ from utils import solution_file, get_loss_metrics, checkpoint_file
 # from utils import plot_model_to_file_kwargs
 
 from models import load_model, freeze_top_layers
-from utils import evaluate, save_percentile, model_dir, ratios_and_labels, evaluate_val_test_curves
+from utils import evaluate, save_percentile, model_dir, ratios_and_labels, evaluate_curves, infer_and_get_f1_and_save
 # from architectures import *
 # from utils.hardcoded_args import *
 # from utils.data import DataCollection
@@ -64,6 +64,12 @@ def main(kwargs: dict):
     train_data, train_masks, test_data, test_masks = load_raw_data(**kwargs)
 
     # Preprocess all
+    #print(kwargs['train_with_test'])
+    #print(kwargs['train_with_test'] == True)
+    #print(kwargs['train_with_test'] == False)
+    if np.isnan(kwargs['train_with_test']): kwargs['train_with_test'] = False
+
+
     train_data, train_masks, val_data, val_masks, test_data, test_masks, proc_dict = preprocess_all(train_data,
                                                                                                     train_masks,
                                                                                                     test_data,
@@ -108,9 +114,10 @@ def main(kwargs: dict):
     #results = {**results, **model_dict}
 
     # ----------------------------------- Perform task -----------------------------------
+    # print('num val = ', kwargs['num_val'])
 
     kwargs['pos_weight'] = 1.0
-    print(kwargs['shuffle_seed'])
+    print('shuffle_seed = ', kwargs['shuffle_seed'])
     if task in ('train', 'transfer_train'):
         #train_dict = train_combined_tf(model, train_data, train_masks, val_data, val_masks, **kwargs)
         train_dict = train(model, train_data, train_masks, val_data, val_masks, **kwargs)
@@ -125,8 +132,9 @@ def main(kwargs: dict):
         results = {**results, **metrics_dict}
 
     if task in ('eval_test',):
-        #metrics_dict = evaluate_test(model, test_data[0:64, ...], test_masks[0:64, ...], **kwargs)
-        metrics_dict = evaluate_val_test_curves(model, test_data, test_masks, val_data, val_masks, **kwargs)
+        # metrics_dict = evaluate_test(model, test_data[0:64, ...], test_masks[0:64, ...], **kwargs)
+        metrics_dict = evaluate_curves(model, test_data, test_masks, val_data, val_masks, train_data, train_masks, **kwargs)
+        # metrics_dict = infer_and_get_f1_and_save(model, test_data, test_masks, **kwargs)
         results = {**results, **metrics_dict}
 
     # elif kwargs['task'] == 'infer':
@@ -149,34 +157,38 @@ def main(kwargs: dict):
 
 def my_args(args_):
     from coolname import generate_slug as new_name
+    print('RUNNING MY ARGS, LINE IN if __main__ NOT COMMENTED OUT')
 
+    args_.fold = 0
     args_.model_class = 'RNET5'
-    args_.cmd_args = ['data_path', 'data_name', 'output_path', 'model_name', 'n_splits', 'seed']
+    args_.cmd_args = ['data_path', 'data_name', 'output_path', 'model_name', 'n_splits', 'seed', 'limit']
+    args_.seed = 'bestmodel_f1' # 'eval_curves_adaptive'
     args_.n_splits = 1  # full size images
     args_.limit = 14  # full size images
-    args_.task = 'eval_test'
+    args_.task = 'train'
     args_.train_with_test = False
     args_.freeze_top_layers = True
     args_.calc_train_val_auc = True
     args_.rfi_set = 'combined'
     args_.rfi_split_ratio = 0.01
-    args_.model_name = 'jolly-nondescript-porcupine-of-endeavor' # 'gentle-wealthy-fox-of-virtuosity' # 'pompous-feathered-degu-of-attack'  #  # new_name()
+    # RNET5 MSE: pompous-feathered-degu-of-attack, dice: debonair-holistic-gaur-of-reading, bce: victorious-abstract-petrel-of-saturation, logcoshdice: economic-soft-mantis-of-fury
+    # args_.model_name = 'proud-malamute-of-abstract-intensity' # Best L2 model
+    args_.model_name = 'test' # 'burrowing-tricky-swan-of-wealth' # Best H3 model
     args_.parent_model_name = None # 'crazy-mini-catfish-from-hyperborea'#'determined-happy-skunk-of-opportunity'
     args_.anomaly_class = 'rfi'
     args_.anomaly_type = 'MISO'
     args_.percentage_anomaly = 0.0
     # HERA: 14: 800, 28: 400, 56: 200, 112 (50% of hyp set): 100
-    args_.epochs = 800
+    args_.epochs = 2
     args_.latent_dim = 8
     args_.alphas = [1.0]
     args_.neighbours = [2, 8]
     args_.radius = 2
     args_.algorithm = 2
-    args_.data_name = 'LOFAR'
-    #args_.data_name = 'HERA_CHARL'
-    args_.data_path = '/home/ee487519/DatasetsAndConfig/Given/43_Mesarcik_2022/'
-    #args_.data_path = '/home/ee487519/DatasetsAndConfig/Generated/HERA_Charl/'
-    args_.seed = 'eval_1000_curves'
+    #args_.data_name = 'LOFAR'
+    args_.data_name = 'HERA_CHARL'
+    #args_.data_path = '/home/ee487519/DatasetsAndConfig/Given/43_Mesarcik_2022/'
+    args_.data_path = '/home/ee487519/DatasetsAndConfig/Generated/HERA_Charl/'
     args_.debug = 0
     args_.log = True
     args_.rotate = False
@@ -222,11 +234,11 @@ def my_args(args_):
     args_.epoch_image_interval = 50
     args_.images_per_epoch = 10
     args_.early_stop = 1000
-    args_.shuffle_seed = None  # 3476595572 2342063437
+    args_.shuffle_seed = 42  # 3476595572 2342063437
     args_.val_split = 0.2
     args_.final_activation = 'sigmoid'
     args_.activation = 'relu'
-    args_.output_path = '/home/ee487519/PycharmProjects/RFI-NLN-HPC/downloads/' # './outputs'
+    args_.output_path = '/home/ee487519/PycharmProjects/RFI-NLN-HPC/downloads/junk' # './outputs'
     args_.save_dataset = False
     args_.shuffle_patches = True
     return args_
@@ -235,7 +247,7 @@ def my_args(args_):
 if __name__ == '__main__':
     # main-args, pre_processor, main, entire models folder checkpointer
 
-    main_args.args = my_args(main_args.args)
+    # main_args.args = my_args(main_args.args)
     main(to_dict(main_args.args))
     # tf.keras.backend.clear_session()
     # main(to_dict(main_args.args))

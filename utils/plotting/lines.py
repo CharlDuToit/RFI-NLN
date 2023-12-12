@@ -12,6 +12,7 @@ def sort_by_x(x_vals, y_vals):
 
 def save_lines(list_of_list_of_x, list_of_list_of_y, list_of_list_of_sizes=None, scatter=False, labels=None, size=10, figsize=(10,10),
                logx=False, logy=False, dir_path='./',
+               grid=False,
                file_name='lines', xlabel='x-axis', ylabel='y-axis', title=None, axis_fontsize=30,
                xtick_size=20, ytick_size=20, legend_fontsize=20, title_fontsize=20, legend_title=None,
                xlim_top=None, xlim_bottom=None, ylim_top=None, ylim_bottom=None, show=False, linewidth=10,
@@ -38,6 +39,7 @@ def save_lines(list_of_list_of_x, list_of_list_of_y, list_of_list_of_sizes=None,
         show_legend = show_legend or label
 
     apply_plot_settings(fig, ax,
+                        grid=grid,
                         xlim_top=xlim_top,
                         xlim_bottom=xlim_bottom,
                         ylim_top=ylim_top,

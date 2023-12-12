@@ -4,8 +4,128 @@ from sklearn.metrics import roc_curve,auc
 #from inference import infer, get_error
 import os
 import numpy as np
+from .common import apply_plot_settings
+import matplotlib.colors as colors
+
 #import pandas as pd
 
+
+
+def signif(x, p):
+    x = np.asarray(x)
+    x_positive = np.where(np.isfinite(x) & (x != 0), np.abs(x), 10**(p-1))
+    mags = 10 ** (p - 1 - np.floor(np.log10(x_positive)))
+    return np.round(x * mags) / mags
+
+# -----------------------------
+def save_waterfall(data,
+                         xlabel='Frequency Bins',
+                         ylabel='Time Bins',
+                         # hor_vals=None,
+                         # ver_vals=None,
+                         x_range=None,
+                         y_range=None,
+                         n_xticks=5,
+                         n_yticks=5,
+                         log=True,
+                         int_ticks=True,
+                         show_ticks=True,
+                   show_ytick_labels=True,
+                   show_xtick_labels=True,
+                         figsize=(10,20),
+                   layout_rect=None,
+                   dir_path='./',
+                         file_name='test',
+                         title=None,
+                         title_fontsize=25,
+                         axis_fontsize=25,
+                         xtick_size=25,
+                         ytick_size=25,
+                         show=False,
+                         show_legend=True,
+                         legend_fontsize=25,
+                         legendspacing=None,
+                         legend_borderpad=None,
+                         legend_bbox=None,
+                         ):
+
+    fig, ax = plt.subplots(figsize=figsize)
+    # ---------------------------------------------------------------------
+    cmap = plt.cm.jet
+    cmap = plt.cm.viridis
+    if log:
+        norm = colors.LogNorm(vmin=np.min(data), vmax=np.max(data))
+    else:
+        norm = plt.Normalize(vmin=np.min(data), vmax=np.max(data))
+    x_color = cmap(norm(data))
+
+    # ---------------------------------------------------------------------
+    # Create the final image
+    ax.imshow(x_color, norm=norm,
+              # map=cmap,
+              # aspect='equal'
+              )
+    if show_legend:
+        plt.colorbar()
+
+    # ---------------------------------------------------------------------
+    # x and y ticks
+    x_min = x_range[0] if x_range else 0
+    x_max = x_range[1] if x_range else data.shape[0] - 1
+    y_min = y_range[0] if y_range else 0
+    y_max = y_range[1] if y_range else data.shape[1] - 1
+
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+    if show_ticks:
+        xticks=np.arange(0, data.shape[0] - 1, int((data.shape[0] - 1)/n_xticks))
+        xlabels=[ signif(x_min + i*(x_max-x_min)/(len(xticks)-1), 4) for i in range(len(xticks))]
+        if int_ticks:
+            xlabels = [int(lab) for lab in xlabels]
+
+        # ax.set_xticks(ticks=xticks,
+        #               labels=xlabels
+        #               )
+
+        if show_xtick_labels:
+            ax.set_xticks(ticks=xticks,
+                          labels=xlabels
+                          )
+        else:
+            ax.set_xticks(ticks=xticks,
+                          labels=['' for x in xticks]
+                          )
+
+        yticks=np.arange(0, data.shape[1] - 1, int((data.shape[1] - 1)/n_yticks))
+        ylabels=[ signif(y_min + i*(y_max-y_min)/(len(yticks)-1), 4) for i in range(len(yticks))]
+        if int_ticks:
+            ylabels = [int(lab) for lab in ylabels]
+        ax.set_yticks(ticks=yticks,
+                      labels=ylabels
+                      )
+        if show_ytick_labels:
+            ax.set_yticks(ticks=yticks,
+                          labels=ylabels
+                          )
+        else:
+            ax.set_yticks(ticks=yticks,
+                          labels=['' for y in yticks]
+                          )
+
+    # ---------------------------------------------------------------------
+    apply_plot_settings(fig, ax,
+                        dir_path=dir_path,
+                        layout_rect=layout_rect,
+                        file_name=file_name,
+                        xlabel=xlabel,
+                        ylabel=ylabel,
+                        title=title,
+                        title_fontsize=title_fontsize,
+                        axis_fontsize=axis_fontsize,
+                        xtick_size=xtick_size,
+                        ytick_size=ytick_size,
+                        show=show)
 
 def save_image_masks_batches(dir_path, data, masks, batch_size=20, figsize=(20, 60)):
     for i in range(0, len(data), batch_size):
@@ -27,6 +147,33 @@ def save_image_masks_batches(dir_path, data, masks, batch_size=20, figsize=(20, 
             os.makedirs(dir_path)
 
         fig.savefig(os.path.join(dir_path, f'image_masks_{strt}'))
+
+        plt.close('all')
+
+
+def save_image_masks_masksinferred_batches(dir_path, data, masks, masks_inferred, batch_size=20, figsize=(20, 60)):
+    for i in range(0, len(data), batch_size):
+        strt = i
+        fnsh = np.minimum(strt + batch_size, len(data))
+        d = data[strt:fnsh, ..., 0]
+        m = masks[strt:fnsh, ..., 0]
+        mi = masks_inferred[strt:fnsh, ..., 0]
+
+        fig, ax = plt.subplots(len(d), 3, figsize=figsize)
+
+        ax[0, 0].title.set_text('Input')
+        ax[0, 1].title.set_text('True Mask')
+        ax[0, 2].title.set_text('Infer Mask')
+        for j in range(len(d)):
+            ax[j, 0].imshow(d[j])
+            ax[j, 1].imshow(m[j])
+            ax[j, 2].imshow(mi[j])
+
+        plt.tight_layout()
+        if not os.path.exists(dir_path):
+            os.makedirs(dir_path)
+
+        fig.savefig(os.path.join(dir_path, f'image_masks_infmasks_{strt}'))
 
         plt.close('all')
 

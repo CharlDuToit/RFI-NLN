@@ -1,16 +1,86 @@
 from .inference import infer_fcn
 from utils import reconstruct, rfi_ratio_split
-from utils import save_data_masks_inferred
+from utils import save_data_masks_inferred, save_image_masks_masksinferred_batches
 from utils import rfi_ratio_indexes
 from utils import save_lines
-from .segmentation_metrics import auroc, auprc, f1, precision, accuracy, recall, prec_recall_vals, fpr_tpr_vals, conf_matrix
+from .segmentation_metrics import auroc, auprc, f1, precision, accuracy, recall, \
+    recall_prec_f1_fpr_tn_fp_fn_fp, conf_matrix  # , prec_recall_vals, fpr_tpr_vals, conf_matrix
+from .dynamic_threshold import range_rounding
 import numpy as np
 import pandas as pd
 from utils import model_dir, rfi_file, unshuffle, save_scatter
 import time
+import os
+from scipy.io import savemat
 
-from sklearn.metrics import (roc_curve,auc)
+from sklearn.metrics import (roc_curve, auc, precision_recall_curve, f1_score, precision_score, recall_score,
+                             accuracy_score, confusion_matrix)
 import tensorflow as tf
+
+
+def infer_and_get_f1_and_save(model, data, masks, raw_input_shape, patch_x, patch_y,
+                              data_subset='test',
+                              batch_size=64,
+                              shuffle_seed=None, shuffle_patches=False,
+                              **kwargs):
+    if data is None or masks is None:
+        return {}
+
+    # ------------------------------------ Infer ------------------------------------
+    masks_inferred = infer_fcn(model, data, batch_size=batch_size)
+    masks_inferred = np.clip(masks_inferred, 0.0, 1.0)
+
+    # ------------------------------------ Unshuffle and Reconstruct ------------------------------------
+    if shuffle_patches:
+        data, masks, masks_inferred = unshuffle(shuffle_seed, data, masks, masks_inferred)
+    # n_p = patches_per_image * images_per_epoch
+    # reconstruct_and_save_images(data[:n_p], masks[:n_p], masks_inferred[:n_p], **kwargs)
+    data_recon = reconstruct(data, raw_input_shape, patch_x, patch_y, None, None)
+    masks_recon = reconstruct(masks, raw_input_shape, patch_x, patch_y, None, None)
+    inferred_masks_recon = reconstruct(masks_inferred, raw_input_shape, patch_x, patch_y, None, None)
+
+    indexes = np.argsort(masks_recon.mean(axis=(1,2,3)))
+    data_recon = data_recon[indexes]
+    masks_recon = masks_recon[indexes]
+    inferred_masks_recon = inferred_masks_recon[indexes]
+
+    # ------------------------------------ Save data  ------------------------------------
+    savemat(os.path.join(model_dir(**kwargs), 'inferred.mat'),
+            {
+                'data': data_recon,
+                'masks': masks_recon,
+                'pred': inferred_masks_recon
+            }
+            )
+
+    # ------------------------------------ Save images  ------------------------------------
+    _dir = os.path.join(model_dir(**kwargs), 'images')
+    save_image_masks_masksinferred_batches(_dir, data_recon, masks_recon, inferred_masks_recon)
+
+    # ------------------------------------ Calculate per image F1  ------------------------------------
+    # reconstruct_and_save_images(data, masks, masks_inferred, **kwargs)
+    images_f1 = [f1(m, mi) for m, mi in zip(masks_recon, inferred_masks_recon)]
+    worst_f1_index = np.argmin(images_f1)
+    best_f1_index = np.argmax(images_f1)
+    worst_f1 = images_f1[worst_f1_index]
+    best_f1 = images_f1[best_f1_index]
+    print(worst_f1_index, worst_f1, best_f1_index, best_f1)
+
+    # # ------------------------------------ Save image CSV ------------------------------------
+    im_dict = {
+        f'{data_subset}_f1': images_f1,
+        f'{data_subset}_rfi_ratio': masks_recon.mean(axis=(1,2,3)),
+
+    }
+    df = pd.DataFrame.from_dict(im_dict)
+    df.to_csv(os.path.join(model_dir(**kwargs), 'image_rfiratio.csv'))
+
+    return {  # (
+        f'{data_subset}_worst_f1_index': worst_f1_index,
+        f'{data_subset}_worst_f1': worst_f1,
+        f'{data_subset}_best_f1_index': best_f1_index,
+        f'{data_subset}_best_f1': best_f1,
+    }
 
 
 def infer_and_get_metrics(model, data, masks, patches_per_image, data_subset='train', save_images=False, batch_size=64,
@@ -61,17 +131,33 @@ def infer_and_get_metrics(model, data, masks, patches_per_image, data_subset='tr
     #              ylabel='F1-score', file_name=f'{data_subset}_rfi_f1')
 
     # ------------------------------------ Calculate metrics------------------------------------
+    # _f1 = f1(masks, masks_inferred)
+    _accuracy = accuracy(masks, masks_inferred)
+    _recall = recall(masks, masks_inferred)
+    _precision = precision(masks, masks_inferred)
+    _f1 = 2 * _recall * _precision / (_precision + _recall)
+    # TN, FP, FN, TP = conf_matrix(masks, masks_inferred, thr=0.5)
+
+    masks_inferred = masks_inferred.flatten()
+    masks = masks.flatten()
+
+    # _accuracy = accuracy_score(masks, masks_inferred > 0.5)
+    # _recall, _precision, fpr_half, _f1, TN, FP, FN, TP = recall_prec_f1_fpr_tn_fp_fn_fp(masks, masks_inferred)
+
+    #  clever rounding
+    masks_inferred = range_rounding(masks_inferred)
+
+    _dir = model_dir(**kwargs)
     if calc_auc:
-        #_auroc = auroc(masks, masks_inferred)
-        #_auprc = auprc(masks, masks_inferred)
-
-        fpr, tpr, thr = fpr_tpr_vals(masks, masks_inferred)
+        fpr, tpr, thr = roc_curve(masks, masks_inferred)
+        save_lines(fpr, tpr, linewidth=1, size=5, scatter=True, xlabel='FPR', ylabel='TPR',
+                   file_name=f'{data_subset}_fpr_tpr_curve_rr', dir_path=_dir)
         _auroc = auc(fpr, tpr)
-        save_lines(fpr, tpr, linewidth=1, size=5, scatter=True, xlabel='FPR', ylabel='TPR', file_name='fpr_tpr_curve', dir_path=_dir)
 
-        prec, recall_, threshold = prec_recall_vals(masks, masks_inferred)
-        _auprc = auc(recall, precision)
-        save_lines(recall_, prec, linewidth=1, size=5, scatter=True, xlabel='Recall', ylabel='Precision', file_name='prec_recall_curve', dir_path=_dir)
+        prec, recall_, threshold = precision_recall_curve(masks, masks_inferred)
+        save_lines(recall_, prec, linewidth=1, size=5, scatter=True, xlabel='Recall', ylabel='Precision',
+                   file_name=f'{data_subset}_prec_recall_curve_rr', dir_path=_dir)
+        _auprc = auc(recall_, prec)
     else:
         fpr = None
         tpr = None
@@ -81,36 +167,34 @@ def infer_and_get_metrics(model, data, masks, patches_per_image, data_subset='tr
         threshold = None
         _auroc = None
         _auprc = None
-    _f1 = f1(masks, masks_inferred)
-    _accuracy = accuracy(masks, masks_inferred)
-    _recall = recall(masks, masks_inferred)
-    _precision = precision(masks, masks_inferred)
-    TN, FP, FN, TP = conf_matrix(masks, masks_inferred, thr=0.5)
 
     # ------------------------------------ Calculate F1 score for low and high rfi ratios -------------------------
     # rfi_split_ratio = 0.01
 
-    lo_ind = true_rfi_ratio < rfi_split_ratio
-    hi_ind = true_rfi_ratio >= rfi_split_ratio
+    # lo_ind = true_rfi_ratio < rfi_split_ratio
+    # hi_ind = true_rfi_ratio >= rfi_split_ratio
+    #
+    # f1_lo = f1_score(masks[lo_ind], masks_inferred[lo_ind] > 0.5)
+    # f1_hi = f1_score(masks[hi_ind], masks_inferred[hi_ind] > 0.5)
 
-    f1_lo = f1(masks[lo_ind], masks_inferred[lo_ind])
-    f1_hi = f1(masks[hi_ind], masks_inferred[hi_ind])
+    print(data_subset, ' time: ', time.time() - start)
 
     # ------------------------------------ Returns metrics dict ------------------------------------
     return {  # (
-        f'{data_subset}_auroc': _auroc,
-        f'{data_subset}_auprc': _auprc,
-        f'{data_subset}_f1': _f1,
-        f'{data_subset}_f1_low': f1_lo,
-        f'{data_subset}_f1_high': f1_hi,
+        f'{data_subset}_auroc_new': _auroc,
+        f'{data_subset}_auprc_new': _auprc,
+        f'{data_subset}_f1_new': _f1,
+        #f'{data_subset}_f1_low': f1_lo,
+        #f'{data_subset}_f1_high': f1_hi,
         f'{data_subset}_accuracy': _accuracy,
-        f'{data_subset}_recall': _recall,
-        f'{data_subset}_precision': _precision,
+        f'{data_subset}_recall_new': _recall,
+        f'{data_subset}_precision_new': _precision,
+        # f'{data_subset}_fpr_new': fpr_half,
 
-        f'{data_subset}_TN': TN,
-        f'{data_subset}_FP': FP,
-        f'{data_subset}_FN': FN,
-        f'{data_subset}_TP': TP,
+        # f'{data_subset}_TN': TN,
+        # f'{data_subset}_FP': FP,
+        # f'{data_subset}_FN': FN,
+        # f'{data_subset}_TP': TP,
 
         f'{data_subset}_fpr_vals': list(fpr),
         f'{data_subset}_tpr_vals': list(tpr),
@@ -224,10 +308,16 @@ def infer_and_get_curves(model, data, masks, patches_per_image, save_images=Fals
                          images_per_epoch=10, shuffle_seed=None, shuffle_patches=False,
                          data_subset='test',
                          **kwargs):
+    start = time.time()
+
+    verbose = False
+    if verbose: print('Evaluating: ', data_subset)
+
     if data is None or masks is None:
         return {}
 
     # ------------------------------------ Infer ------------------------------------
+    if verbose: print('   Infering...')
     masks_inferred = infer_fcn(model, data, batch_size=batch_size)
     masks_inferred = np.clip(masks_inferred, 0.0, 1.0)
 
@@ -241,28 +331,52 @@ def infer_and_get_curves(model, data, masks, patches_per_image, save_images=Fals
             reconstruct_and_save_images(data[:n_p], masks[:n_p], masks_inferred[:n_p], **kwargs)
 
     # ------------------------------------ Calculate metrics------------------------------------
-    TN, FP, FN, TP = conf_matrix(masks, masks_inferred, thr=0.5)
-
     _dir = model_dir(**kwargs)
-    fpr, tpr, thr = fpr_tpr_vals(masks, masks_inferred)
-    save_lines(fpr, tpr, linewidth=1, size=5, scatter=True, xlabel='FPR', ylabel='TPR', file_name=f'{data_subset}_fpr_tpr_curve', dir_path=_dir)
-    #save_lines(fpr, tpr, linewidth=1, size=5, scatter=True, xlabel='FPR', ylabel='TPR', file_name='fpr_tpr_curve', dir_path=kwargs['output_path'])
 
+    # flatten
+    masks_inferred = masks_inferred.flatten()
+    masks = masks.flatten()
 
-    prec, recall_, threshold = prec_recall_vals(masks, masks_inferred)
-    save_lines(recall_, prec, linewidth=1, size=5, scatter=True, xlabel='Recall', ylabel='Precision', file_name=f'{data_subset}_prec_recall_curve', dir_path=_dir)
-    #save_lines(recall_, prec, linewidth=1, size=5, scatter=True, xlabel='Recall', ylabel='Precision', file_name='prec_recall_curve', dir_path=kwargs['output_path'])
+    _recall, _precision, fpr_half, _f1, TN, FP, FN, TP = 0, 0, 0, 0, 0, 0, 0, 0
+    if data_subset != 'train':
+        if verbose: print('   Calculating conf matrix')
+        _recall, _precision, fpr_half, _f1, TN, FP, FN, TP = recall_prec_f1_fpr_tn_fp_fn_fp(masks, masks_inferred)
 
+    #  clever rounding
+    masks_inferred = range_rounding(masks_inferred)
+
+    #
+    if verbose: print('   Calculating roc')
+    fpr, tpr, thr = roc_curve(masks, masks_inferred)
+    save_lines(fpr, tpr, linewidth=1, size=5, scatter=True, xlabel='FPR', ylabel='TPR',
+               file_name=f'{data_subset}_fpr_tpr_curve_rr', dir_path=_dir)
+    if verbose: print('   Calculating area under roc')
+    auroc_ = auc(fpr, tpr)
+    # print(len(thr)) # test 6 328 392, val 44577
+
+    prec, recall_, threshold = precision_recall_curve(masks, masks_inferred)
+    save_lines(recall_, prec, linewidth=1, size=5, scatter=True, xlabel='Recall', ylabel='Precision',
+               file_name=f'{data_subset}_prec_recall_curve_rr', dir_path=_dir)
+    auprc_ = auc(recall_, prec)
+
+    print(data_subset, ' time: ', time.time() - start)
 
     # ------------------------------------ Returns metrics dict ------------------------------------
     return {  # (
-        f'{data_subset}_fpr_vals': list(fpr),
         f'{data_subset}_tpr_vals': list(tpr),
-        f'{data_subset}_fpr_tpr_thr_vals':  list(thr),
-        f'{data_subset}_prec_vals':  list(prec),
-        f'{data_subset}_recall_vals':  list(recall_),
-        f'{data_subset}_prec_recall_thr_vals':  list(threshold),
+        f'{data_subset}_fpr_vals': list(fpr),
+        f'{data_subset}_fpr_tpr_thr_vals': list(thr),
+        f'{data_subset}_prec_vals': list(prec),
+        f'{data_subset}_recall_vals': list(recall_),
+        f'{data_subset}_prec_recall_thr_vals': list(threshold),
 
+        f'{data_subset}_auprc_new': auprc_,
+        f'{data_subset}_auroc_new': auroc_,
+
+        f'{data_subset}_f1_new': _f1,
+        f'{data_subset}_recall_new': _recall,
+        f'{data_subset}_precision_new': _precision,
+        f'{data_subset}_fpr_new': fpr_half,
         f'{data_subset}_TN': TN,
         f'{data_subset}_FP': FP,
         f'{data_subset}_FN': FN,
@@ -307,17 +421,17 @@ def evaluate(model,
 
     generalization_metrics = {}
     if test_metrics:
-        test_f1 = 'test_f1'
+        test_f1 = 'test_f1_new'
         print(f'Test F1: {test_metrics[test_f1]}')
         if calc_train_val_auc:
-            generalization_metrics['train_auprc_over_test_auprc'] = train_metrics['train_auprc'] / test_metrics[
-                'test_auprc']
+            generalization_metrics['train_auprc_over_test_auprc_new'] = train_metrics['train_auprc_new'] / test_metrics[
+                'test_auprc_new']
     if calc_train_val_auc:
         if val_metrics:
-            generalization_metrics['train_auprc_over_val_auprc'] = train_metrics['train_auprc'] / val_metrics[
-                'val_auprc']
+            generalization_metrics['train_auprc_over_val_auprc_new'] = train_metrics['train_auprc_new'] / val_metrics[
+                'val_auprc_new']
         if val_metrics and test_metrics:
-            generalization_metrics['val_auprc_over_test_auprc'] = val_metrics['val_auprc'] / test_metrics['test_auprc']
+            generalization_metrics['val_auprc_over_test_auprc_new'] = val_metrics['val_auprc_new'] / test_metrics['test_auprc_new']
     print(f'Evaluation time: {time.time() - start}s')
 
     return {
@@ -328,17 +442,31 @@ def evaluate(model,
     }
 
 
-def evaluate_val_test_curves(model,
-                             test_data,
-                             test_masks,
-                             val_data,
-                             val_masks,
-                             **kwargs
-                             ):
+def evaluate_curves(model,
+                    test_data,
+                    test_masks,
+                    val_data,
+                    val_masks,
+                    train_data,
+                    train_masks,
+                    **kwargs
+                    ):
+    start = time.time()
+    print('Evaluating model')
+
     test_metrics = infer_and_get_curves(model, test_data, test_masks, save_images=False, data_subset='test', **kwargs)
     val_metrics = infer_and_get_curves(model, val_data, val_masks, save_images=False, data_subset='val', **kwargs)
+    train_metrics = infer_and_get_curves(model, train_data, train_masks, save_images=False, data_subset='train',
+                                         **kwargs)
 
-    return {**test_metrics, **val_metrics}
+    generalization_metrics = dict()
+    generalization_metrics['train_auprc_over_test_auprc_new'] = train_metrics['train_auprc_new'] / test_metrics[
+        'test_auprc_new']
+    generalization_metrics['train_auprc_over_val_auprc_new'] = train_metrics['train_auprc_new'] / val_metrics[
+        'val_auprc_new']
+
+    print(f'Evaluation time: {time.time() - start}s')
+    return {**generalization_metrics, **train_metrics, **test_metrics, **val_metrics}
 
 
 def evaluate_separate(model,

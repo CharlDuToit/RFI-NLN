@@ -1,5 +1,5 @@
-#import copy
-#import pandas as pd
+# import copy
+# import pandas as pd
 import numpy as np
 import pandas as pd
 
@@ -7,15 +7,16 @@ from .load_save_csv import load_csv
 from .results_helper import (query_df,
                              groupby_and_agg,
                              get_vals,
-                            get_val,
-                            signif,
+                             get_val,
+                             signif,
                              get_labels,
                              get_label,
                              get_means_stds_from_grouped_df,
                              to_query,
                              query_df_with_row_vals,
                              df_to_latex_table)
-from utils.plotting import save_bubble, save_epochs_curve, save_lines, save_scatter_gmm, save_recall_prec_curve, save_fpr_tpr_curve
+from utils.plotting import save_bubble, save_epochs_curve, save_lines, save_scatter_gmm, save_recall_prec_curve, \
+    save_fpr_tpr_curve, save_bar
 import os
 from copy import deepcopy
 
@@ -82,12 +83,14 @@ class ResultsCollection:
         #
         #     cond = [df['model_class'] == mdl for mdl in df['model_class'].unique()]
 
-        # query df
+        # query
         df = query_df(df, self.query_strings, self.incl_models, self.excl_models, self.datasets)
         self.queried_df = df
 
-        # L3 dfq = df.query('limit < 30')
-        # H4 dfq = df.query('data_name=="HERA_CHARL"')
+        # L2 best val f1 : 'proud-malamute-of-abstract-intensity'
+        # H3 best val f1: 'burrowing-tricky-swan-of-wealth'
+        # df_R5 = df.query('model_class == "RNET5"')
+        # df_R5[['val_f1', 'model_name']]
 
         # names = ' '.join([a for a in df['model_name']])
 
@@ -103,7 +106,8 @@ class ResultsCollection:
         # names = ' '.join([a for a in dfq['model_name']])
 
         # debug here to copy string
-        transfer_strings = [mdl_class +','+mdl_name for mdl_class, mdl_name in zip(df['model_class'], df['model_name'])]
+        transfer_strings = [mdl_class + ',' + mdl_name for mdl_class, mdl_name in
+                            zip(df['model_class'], df['model_name'])]
         transfer_strings = ' '.join(transfer_strings) + ';'
 
         # Create path
@@ -164,7 +168,7 @@ class ResultsCollection:
         if task == 'scatter':
             self.queried_df['time_image'] = self.queried_df['time_image'] * 1000  # ms
 
-            dfg = groupby_and_agg(self.queried_df, self.groupby, self.y_axis)
+            dfg = groupby_and_agg(self.queried_df, self.groupby, [self.x_axis, self.y_axis])
 
             x_vals = np.array(get_vals(dfg, self.x_axis))
             y_vals = get_vals(dfg, self.y_axis)
@@ -177,14 +181,18 @@ class ResultsCollection:
             dfg = groupby_and_agg(self.queried_df, self.groupby)
             means, stds, labels = [], [], []
             if task == 'train_loss':
-                means, stds = get_means_stds_from_grouped_df(self.output_path, self.queried_df, dfg, self.groupby, prefix='train')
+                means, stds = get_means_stds_from_grouped_df(self.output_path, self.queried_df, dfg, self.groupby,
+                                                             prefix='train')
                 labels = get_labels(dfg, self.label_fields, self.label_format)
             elif task == 'val_loss':
-                means, stds = get_means_stds_from_grouped_df(self.output_path, self.queried_df, dfg, self.groupby, prefix='val')
+                means, stds = get_means_stds_from_grouped_df(self.output_path, self.queried_df, dfg, self.groupby,
+                                                             prefix='val')
                 labels = get_labels(dfg, self.label_fields, self.label_format)
             elif task == 'train_val_loss':
-                train_means, train_stds = get_means_stds_from_grouped_df(self.output_path, self.queried_df, dfg, self.groupby, prefix='train')
-                val_means, val_stds = get_means_stds_from_grouped_df(self.output_path, self.queried_df, dfg, self.groupby, prefix='val')
+                train_means, train_stds = get_means_stds_from_grouped_df(self.output_path, self.queried_df, dfg,
+                                                                         self.groupby, prefix='train')
+                val_means, val_stds = get_means_stds_from_grouped_df(self.output_path, self.queried_df, dfg,
+                                                                     self.groupby, prefix='val')
                 means = list(train_means) + list(val_means)
                 stds = list(train_stds) + list(val_stds)
                 labels = get_labels(dfg, self.label_fields, self.label_format)
@@ -208,25 +216,6 @@ class ResultsCollection:
 
             save_lines(x_vals, y_vals, labels=labels, **self.plot_options)
 
-        # elif task == 'line_marker_size':
-        #     # One of the fields in groupby must be numerical (limit) so that the size of markers on a spesific line
-        #     # indicates this field (limit)
-        #     # self.line_marker_size_field
-        #     # x_axis and y_axis must not be in grouby
-        #
-        #     dfg = groupby_and_agg(self.queried_df, self.groupby, [self.x_axis, self.y_axis])
-        #     x_vals = []
-        #     y_vals = []
-        #     labels = get_labels(dfg, self.label_fields, self.label_format)
-        #     for i in range(dfg.shape[0]):
-        #         row = dfg.iloc[i]
-        #         df = query_df_with_row_vals(self.queried_df, row, self.groupby)
-        #         x_vals.append(get_vals(df, self.x_axis))
-        #         y_vals.append(get_vals(df, self.y_axis))
-        #
-        #     # list of list of x, list of list of y, list of list of sizes, list of labels,
-        #     save_lines(x_vals, y_vals, labels=labels, **self.plot_options)
-        #     # legend for labels, legend for sizes (or draw on point)
 
         elif task == 'line_agg':
             # For each group in dfg there is a parallel list of x and y
@@ -259,9 +248,9 @@ class ResultsCollection:
         elif task == 'text':
             pass
         elif task == 'table':
-            self.queried_df['flops_image'] = self.queried_df['flops_image']/1e9 # GFLOPS
-            self.queried_df['time_image'] = self.queried_df['time_image']* 1000 # ms
-            self.queried_df['params'] = self.queried_df['params']/1000  # k params
+            self.queried_df['flops_image'] = self.queried_df['flops_image'] / 1e9  # GFLOPS
+            self.queried_df['time_image'] = self.queried_df['time_image'] * 1000  # ms
+            self.queried_df['params'] = self.queried_df['params'] / 1000  # k params
             dfg = groupby_and_agg(self.queried_df, self.groupby, self.table_fields)
 
             # if self.reg_effect:
@@ -272,9 +261,39 @@ class ResultsCollection:
             file = os.path.join(self.save_path, f'{self.save_name}.table')
             with open(file, 'w') as f:
                 f.write(table_str)
+        elif task == 'val_test_table':
+            val_fields = [f'val_{f}' for f in self.table_fields]
+            test_fields = [f'test_{f}' for f in self.table_fields]
+            # dfg = groupby_and_agg(self.queried_df, self.groupby, val_fields + test_fields )
+            grouped = self.queried_df.groupby(self.groupby)
+
+            top_row = ['label'] + self.table_fields
+            table_str = ' & '.join(top_row) + ' \\\\ \n'
+
+            for group_name, group_data in grouped:
+                row = [str(group_name), 'val.']
+                for f in val_fields:
+                    value = str(signif(group_data[f].mean(), 3))
+                    if self.std:
+                        value += '$\\pm$' + str(signif(group_data[f].std(), 1))
+                    row += [value]
+                table_str += ' & '.join(row) + ' \\\\ \n'
+                row = ['', 'test']
+                for f in test_fields:
+                    value = str(signif(group_data[f].mean(), 3))
+                    if self.std:
+                        value += '$\\pm$' + str(signif(group_data[f].std(), 1))
+                    row += [value]
+                table_str += ' & '.join(row) + ' \\\\ \n'
+
+            table_str = table_str.replace('_', '\\_')
+            file = os.path.join(self.save_path, f'{self.save_name}.table')
+            with open(file, 'w') as f:
+                f.write(table_str)
+
         elif task == 'table_with_two_groups':
             if len(self.groupby) != 2:
-                raise('Need two groupby fields for task: table_with_two_groups')
+                raise ('Need two groupby fields for task: table_with_two_groups')
             # dfg = groupby_and_agg(self.queried_df, self.groupby, self.table_fields)
             g1_values = pd.unique(self.queried_df[self.groupby[0]])
             g2_values = pd.unique(self.queried_df[self.groupby[1]])
@@ -311,6 +330,9 @@ class ResultsCollection:
             save_recall_prec_curve(self.queried_df, **self.plot_options)
         elif task == 'fpr_tpr_curve':
             save_fpr_tpr_curve(self.queried_df, **self.plot_options)
+        elif task == 'bar':
+            df = self.queried_df.sort_values(by=['trainable_params', 'trans_group'])
+            save_bar(df, **self.plot_options)
         else:
             print(f'Task {task} not defined')
 
@@ -318,35 +340,9 @@ class ResultsCollection:
 def fix_columns(df, incl_values_columns=False):
     # Add/ fix columns:
 
-    # if 'flops_image' not in df.columns:
-    #     df['flops_image'] = 0
-    # if 'flops_patch' not in df.columns:
-    #     df['flops_patch'] = 0
-    # if 'trainable_params' not in df.columns:
-    #     df['trainable_params'] = 0
-    # if 'nontrainable_params' not in df.columns:
-    #     df['nontrainable_params'] = 0
-    # if 'train_with_test' not in df.columns:
-    #     df['train_with_test'] = False
-    # if 'rescale' not in df.columns:
-    #     df['rescale'] = True
-    # if 'bn_first' not in df.columns:
-    #     df['bn_first'] = False
-    # if 'lr_lin_decay' not in df.columns:
-    #     df['lr_lin_decay'] = 1.0
-    # if 'calc_train_val_auc' not in df.columns:
-    #     df['calc_train_val_auc'] = True
-    # if 'freeze_top_layers' not in df.columns:
-    #     df['freeze_top_layers'] = False
-    # if 'n_splits' not in df.columns:
-    #     df['n_splits'] = 5
-
     if incl_values_columns:
         for subset in ('val', 'test'):
-            df = fix_column(df, f'{subset}_TP', None)
-            df = fix_column(df, f'{subset}_TN', None)
-            df = fix_column(df, f'{subset}_FP', None)
-            df = fix_column(df, f'{subset}_FN', None)
+
 
             df = fix_column(df, f'{subset}_fpr_vals', None)
             df = fix_column(df, f'{subset}_tpr_vals', None)
@@ -362,8 +358,23 @@ def fix_columns(df, incl_values_columns=False):
             df = df_str_to_list(df, f'{subset}_recall_vals')
             df = df_str_to_list(df, f'{subset}_prec_recall_thr_vals')
 
+    # Normalize TP, TN, FP, TN
+    for subset in ('train', 'val', 'test'):
+        df = fix_column(df, f'{subset}_TP', None)
+        df = fix_column(df, f'{subset}_TN', None)
+        df = fix_column(df, f'{subset}_FP', None)
+        df = fix_column(df, f'{subset}_FN', None)
 
+        df = fix_column(df, f'{subset}_auprc_new', 10)
+        df = fix_column(df, f'{subset}_auroc_new', 10)
 
+        df[f'{subset}_total_samples'] = df[f'{subset}_TP'] + df[f'{subset}_TN'] + df[f'{subset}_FP'] + df[f'{subset}_FN']
+        df[f'{subset}_TP'] = df[f'{subset}_TP'] / df[f'{subset}_total_samples']
+        df[f'{subset}_TN'] = df[f'{subset}_TN'] / df[f'{subset}_total_samples']
+        df[f'{subset}_FP'] = df[f'{subset}_FP'] / df[f'{subset}_total_samples']
+        df[f'{subset}_FN'] = df[f'{subset}_FN'] / df[f'{subset}_total_samples']
+
+    df = fix_column(df, 'parent_model_name', 'None')
     df = fix_column(df, 'flops_image', 0)
     df = fix_column(df, 'flops_patch', 0)
     df = fix_column(df, 'nontrainable_params', 0)
@@ -378,62 +389,77 @@ def fix_columns(df, incl_values_columns=False):
     df = fix_column(df, 'rescale', True)
     df = fix_column(df, 'bn_first', False)
 
-    # df.loc[df['task'].isnull(), 'task'] = 'train'
-    # df.loc[df['n_splits'].isnull(), 'n_splits'] = 5
-    # df.loc[df['freeze_top_layers'].isnull(), 'freeze_top_layers'] = False
-    # df.loc[df['train_with_test'].isnull(), 'train_with_test'] = False
-    # df.loc[df['calc_train_val_auc'].isnull(), 'calc_train_val_auc'] = True
-    # df.loc[df['lr_lin_decay'].isnull(), 'lr_lin_decay'] = 1.0
-    # df.loc[df['rescale'].isnull(), 'rescale'] = True
-    # df.loc[df['bn_first'].isnull(), 'bn_first'] = False
+    # ============================= LOFAR TRANSFER GROUPS L3 ============================
 
-    cond = [np.logical_and(df['model_class'] == 'UNET',  df['filters'] == 16),
-            np.logical_and(df['model_class'] == 'AC_UNET',  df['filters'] == 16),
-            np.logical_and(df['model_class'] == 'ASPP_UNET',  df['filters'] == 16),
-            np.logical_and(df['model_class'] == 'RNET5',  df['filters'] == 16),
-            np.logical_and(df['model_class'] == 'RNET',  df['filters'] == 16),
-            np.logical_and(df['model_class'] == 'RFI_NET',  df['filters'] == 16),
-            np.logical_and(df['model_class'] == 'DSC_MONO_RESUNET',  df['filters'] == 16),
-            np.logical_and(df['model_class'] == 'DSC_DUAL_RESUNET',  df['filters'] == 16),
-            ]
-
-    # LOFAR
     lofar_cond_trans = [
-        np.logical_and(np.logical_and(df['task'] == 'train', df['limit'] == 1493), df['data_name'] == 'LOFAR'),
+        np.logical_and(np.logical_and(df['parent_model_name'] == 'None', df['limit'] == 1493), df['data_name'] == 'LOFAR'),
         # np.logical_and(df['task'] == 'train', df['limit'] == 'None'),
-        np.logical_and(np.logical_and(df['task'] == 'train', df['limit'] == 14), df['data_name'] == 'LOFAR'),
-        np.logical_and(np.logical_and(df['task'] == 'train', df['limit'] == 28), df['data_name'] == 'LOFAR'),
-        np.logical_and(np.logical_and(df['task'] == 'train', df['limit'] == 56), df['data_name'] == 'LOFAR'),
-        np.logical_and(np.logical_and(df['task'] == 'train', df['limit'] == 112), df['data_name'] == 'LOFAR'),
-        np.logical_and(np.logical_and(df['task'] == 'train', df['limit'] == 224), df['data_name'] == 'LOFAR'),
-        np.logical_and(np.logical_and(df['task'] == 'transfer_train', df['limit'] == 14), df['data_name'] == 'LOFAR'),
+        np.logical_and(np.logical_and(df['parent_model_name'] == 'None', df['limit'] == 14), df['data_name'] == 'LOFAR'),
+        np.logical_and(np.logical_and(df['parent_model_name'] == 'None', df['limit'] == 28), df['data_name'] == 'LOFAR'),
+        np.logical_and(np.logical_and(df['parent_model_name'] == 'None', df['limit'] == 56), df['data_name'] == 'LOFAR'),
+        np.logical_and(np.logical_and(df['parent_model_name'] == 'None', df['limit'] == 112), df['data_name'] == 'LOFAR'),
+        np.logical_and(np.logical_and(df['parent_model_name'] == 'None', df['limit'] == 224), df['data_name'] == 'LOFAR'),
+        np.logical_and(np.logical_and(df['parent_model_name'] != 'None', df['limit'] == 14), df['data_name'] == 'LOFAR'),
     ]
-    trans_groups = ['aof', 'new 14','new 28','new 56','new 112','new 224', 'tune 14']
+    trans_groups = ['aof', 'new 14', 'new 28', 'new 56', 'new 112', 'new 224', 'tune 14']
 
     df['lofar_trans_group'] = np.select(lofar_cond_trans, trans_groups)
 
-    # HERA
+    # ============================= HERA TRANSFER H4 GROUPS ============================
+
     hera_cond_trans = [
-        np.logical_and(np.logical_and(df['task'] == 'train', df['use_hyp_data'] == True), df['data_name'] == 'HERA_CHARL_AOF'),
+        np.logical_and(np.logical_and(df['parent_model_name'] == 'None', df['use_hyp_data'] == True), df['data_name'] == 'HERA_CHARL_AOF'),
         # np.logical_and(df['task'] == 'train', df['limit'] == 'None'),
-        np.logical_and(np.logical_and(df['task'] == 'train', df['limit'] == 14), df['data_name'] == 'HERA_CHARL'),
-        np.logical_and(np.logical_and(df['task'] == 'train', df['limit'] == 28), df['data_name'] == 'HERA_CHARL'),
-        np.logical_and(np.logical_and(df['task'] == 'train', df['limit'] == 56), df['data_name'] == 'HERA_CHARL'),
-        np.logical_and(np.logical_and(df['task'] == 'train', df['limit'] == 112), df['data_name'] == 'HERA_CHARL'),
-        np.logical_and(np.logical_and(df['task'] == 'train', df['limit'] == 224), df['data_name'] == 'HERA_CHARL'),
-        np.logical_and(np.logical_and(df['task'] == 'transfer_train', df['limit'] == 14), df['data_name'] == 'HERA_CHARL'),
+        np.logical_and(np.logical_and(df['parent_model_name'] == 'None', df['limit'] == 14), df['data_name'] == 'HERA_CHARL'),
+        np.logical_and(np.logical_and(df['parent_model_name'] == 'None', df['limit'] == 28), df['data_name'] == 'HERA_CHARL'),
+        np.logical_and(np.logical_and(df['parent_model_name'] == 'None', df['limit'] == 56), df['data_name'] == 'HERA_CHARL'),
+        np.logical_and(np.logical_and(df['parent_model_name'] == 'None', df['limit'] == 112), df['data_name'] == 'HERA_CHARL'),
+        np.logical_and(np.logical_and(df['parent_model_name'] == 'None', df['limit'] == 224), df['data_name'] == 'HERA_CHARL'),
+        np.logical_and(np.logical_and(df['parent_model_name'] != 'None', df['limit'] == 14),df['data_name'] == 'HERA_CHARL'),
     ]
-    trans_groups = ['aof', 'new 14','new 28','new 56','new 112','new 224', 'tune 14']
+    trans_groups = ['aof', 'new 14', 'new 28', 'new 56', 'new 112', 'new 224', 'tune 14']
 
     df['hera_trans_group'] = np.select(hera_cond_trans, trans_groups)
-    # train_params = [73241, 73241, 73241, 5105, 8353, 202673, 185226, 370494]
-    # nontrain_params = [352, 352, 352, 64, 64, 1760, 2112, 4224]
-    # flops_image = [1389363200, 1554016256, 1471689728, 1317142528, 2158100480, 3642621952, 2815819776, 5642518528]
+
+
+    # ============================= GENERAL TRANSFER GROUPS ============================
+
+    cond_trans = [
+        np.logical_or(df['hera_trans_group'] == 'aof', df['lofar_trans_group'] == 'aof'),
+        np.logical_or(df['hera_trans_group'] == 'new 14', df['lofar_trans_group'] == 'new 14'),
+        np.logical_or(df['hera_trans_group'] == 'tune 14', df['lofar_trans_group'] == 'tune 14'),
+        np.logical_or(df['hera_trans_group'] == 'new 28', df['lofar_trans_group'] == 'new 28'),
+
+    ]
+    trans_groups = ['aof', 'new 14', 'tune 14', 'new 28']
+    df['trans_group'] = np.select(cond_trans, trans_groups)
+
+
+    # ============================= GENERAL DATASET ============================
+
+    cond_data = [
+        np.logical_or(df['data_name'] == 'HERA_CHARL', df['data_name'] == 'HERA_CHARL_AOF'),
+        df['data_name'] == 'LOFAR'
+    ]
+    data = ['HERA', 'LOFAR']
+    df['data'] = np.select(cond_data, data)
+
+    # ============================= FIX FLOPS, PARAMS; ADD SHORT MODEL CLASS ============================
+
 
     train_params = [291633, 291633, 291633, 19809, 32705, 805473, 185226, 370494]
     nontrain_params = [704, 704, 704, 128, 192, 3520, 2112, 4224]
     flops_image = [5496504320, 6152720384, 5824612352, 5150736384, 8510373888, 14482538496, 2815819776, 5642518528]
     short_model_class = ['U', 'AC', 'ASPP', 'R5', 'R7', 'RFI', 'MONO', 'DUAL']
+    cond = [np.logical_and(df['model_class'] == 'UNET', df['filters'] == 16),
+            np.logical_and(df['model_class'] == 'AC_UNET', df['filters'] == 16),
+            np.logical_and(df['model_class'] == 'ASPP_UNET', df['filters'] == 16),
+            np.logical_and(df['model_class'] == 'RNET5', df['filters'] == 16),
+            np.logical_and(df['model_class'] == 'RNET', df['filters'] == 16),
+            np.logical_and(df['model_class'] == 'RFI_NET', df['filters'] == 16),
+            np.logical_and(df['model_class'] == 'DSC_MONO_RESUNET', df['filters'] == 16),
+            np.logical_and(df['model_class'] == 'DSC_DUAL_RESUNET', df['filters'] == 16),
+            ]
 
     df['short_model_class'] = np.select(cond, short_model_class)
 
@@ -443,10 +469,19 @@ def fix_columns(df, incl_values_columns=False):
     df['flops_image'] = np.select(cond, flops_image)
     df['flops_patch'] = df['flops_image'] / 64
 
+    # ============================= AUPRC, LOSS RATIO, REG DISTANCE, REG LABEL ============================
+
+
     df['train_auprc_over_val_auprc'] = df['train_auprc'] / df['val_auprc']
     df['train_loss_over_val_loss'] = df['train_loss'] / df['val_loss']
 
-    df['reg_distance'] = np.sqrt((df['train_auprc_over_val_auprc'] - 1)**2 + (df['train_loss_over_val_loss'] - 1 )**2)
+    df['train_auprc_over_val_auprc_new'] = df['train_auprc_new'] / df['val_auprc_new']
+
+    df['reg_distance'] = np.sqrt(
+        (df['train_auprc_over_val_auprc'] - 1) ** 2 + (df['train_loss_over_val_loss'] - 1) ** 2)
+
+    df['reg_distance_new'] = np.sqrt(
+        (df['train_auprc_over_val_auprc_new'] - 1) ** 2 + (df['train_loss_over_val_loss'] - 1) ** 2)
 
     # reg label
     # df['reg_label'] = df['kernel_regularizer'] + df['dropout']
@@ -455,7 +490,67 @@ def fix_columns(df, incl_values_columns=False):
     df = df.sort_values(by=['model_class', 'loss', 'reg_label'])
     # df1 = df.sort_values(by=['model_class', 'loss', 'reg_label'])
     # df1['model_class']
+    # ============================= EXPERIMENT LABEL ============================
+
+    preproc = np.logical_and.reduce(
+        (df['patch_x'] == 64, df['scale_per_image'] == False, df['clip_per_image'] == False, df['rescale'] == True,
+         df['log'] == True, df['bn_first'] == False, df['perc_min'] == 0.2, df['perc_max'] == 99.8,
+         df['clipper'] == 'perc', df['shuffle_patches'] == True, df['patches'] == True, df['lr'] == 0.0001,
+         df['epochs'] > 49, df['lr_lin_decay'] == 1.0,
+         # df['task'] != 'eval_test',
+         df['filters'] == 16,
+         df['dropout'] < 0.11, df['train_f1'] > 0.5))
+
+    experiment_cond = [
+        np.logical_and.reduce(  # L1
+            (preproc, #df['task'] == 'train',
+             df['data_name'] == 'LOFAR', df['limit'] == 'None',
+             df['use_hyp_data'] == True, df['train_with_test'] == False)),
+        np.logical_and.reduce(  # L2
+            (preproc, # df['task'] == 'train',
+             df['data_name'] == 'LOFAR', df['limit'] == 1493,
+             df['use_hyp_data'] == False, df['train_with_test'] == False)),
+        np.logical_and.reduce(  # L3
+            (preproc, df['data_name'] == 'LOFAR', df['test_f1'] > 0.5, df['lofar_trans_group'] != '0',
+             df['lofar_trans_group'] != 'aof',
+             np.logical_or(np.logical_and(df['parent_model_name'] != 'None', df['freeze_top_layers'] == True),
+                           df['parent_model_name'] == 'None'))),
+             # np.logical_or(np.logical_and(df['task'] == 'transfer_train', df['freeze_top_layers'] == True),
+             #               df['task'] == 'train'))),
+        np.logical_and.reduce(  # H1
+            (preproc, # df['task'] == 'train',
+             df['data_name'] == 'HERA_CHARL', df['limit'] == 'None',
+             df['use_hyp_data'] == True, df['train_with_test'] == False, df['val_auprc'] > 0.85,
+             df['reg_distance'] < 0.7,  df['dropout']==0.1, df['kernel_regularizer']=='l2',)),
+        np.logical_and.reduce(  # H2
+            (preproc, # df['task'] == 'train',
+             df['data_name'] == 'HERA_CHARL', df['limit'] == 'None',
+             df['use_hyp_data'] == False, df['train_with_test'] == False, df['loss'] == 'dice'
+             , df['dropout'] == 0.1, df['kernel_regularizer'] == 'l2',)),
+        np.logical_and.reduce(  # H3
+            (preproc, # df['task'] == 'train',
+             df['data_name'] == 'HERA_CHARL_AOF', df['limit'] == 'None',
+              df['train_with_test'] == False, df['loss'] == 'dice',
+             df['dropout'] == 0.1, df['kernel_regularizer'] == 'l2',)),
+        np.logical_and.reduce(  # H4
+            (preproc, np.logical_or(df['data_name'] == 'HERA_CHARL', df['data_name'] == 'HERA_CHARL_AOF'),
+             df['test_f1'] > 0.0,
+             df['hera_trans_group'] != '0',
+             df['hera_trans_group'] != 'aof',
+             df['hera_trans_group'] != 'new 56',
+             df['hera_trans_group'] != 'new 112',
+             df['hera_trans_group'] != 'new 224',
+             np.logical_or(np.logical_and(df['parent_model_name'] != 'None', df['freeze_top_layers'] == True),
+                           df['parent_model_name'] == 'None'))),
+            #  np.logical_or(np.logical_and(df['task'] == 'transfer_train', df['freeze_top_layers'] == True),
+            #               df['task'] == 'train'))),
+    ]
+    experiments = ['L1', 'L2', 'L3', 'H1', 'H2', 'H3', 'H4']
+
+    df['experiment'] = np.select(experiment_cond, experiments)
+
     return df
+
 
 def fix_column(df, column_name, default_value):
     if column_name not in df.columns:
@@ -470,19 +565,21 @@ def fix_column(df, column_name, default_value):
 
     return df
 
+
 def str_to_list(str_list):
-    if str_list == [] or str_list is None or str_list == '' or str_list == '[]' or str_list=='nan':
+    if str_list == [] or str_list is None or str_list == '' or str_list == '[]' or str_list == 'nan':
         return None
     if '...' in str_list: return None
+    # return list(str_list)
     str_list = str_list.replace(',', '').replace('[', '').replace(']', '').replace('\n', ' ').split(' ')
     while '' in str_list: str_list.remove('')
     list_ = [float(a) for a in str_list]
     # if len(list_) > 200: return None
     return list_
 
+
 def df_str_to_list(df, column_name):
     for i in range(len(df)):
-       # df.iloc[i][column_name] = str_to_list(df.iloc[i][column_name])
+        # df.iloc[i][column_name] = str_to_list(df.iloc[i][column_name])
         df[column_name][i] = str_to_list(df.iloc[i][column_name])
     return df
-

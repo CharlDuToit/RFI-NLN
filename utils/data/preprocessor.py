@@ -43,8 +43,8 @@ def preprocess(data,
     # ret_masks = copy.deepcopy(masks)
 
     # limit
-    print(limit)
-    print(perc_min)
+    # print(limit)
+    # print(perc_min)
     if limit is not None and limit != 'None' and 'test' not in data_subset:
         limit = int(limit)
         data = data[:limit]
@@ -85,6 +85,7 @@ def preprocess_all(train_data,
                    test_data,
                    test_masks,
                    task,
+                   fold,
                    input_channels,
                    val_split,
                    shuffle_seed,
@@ -127,7 +128,8 @@ def preprocess_all(train_data,
         raise ValueError('train_data and test_data is both None')
 
     # Train on hyperparameter data ?
-    if task in ('train', 'transfer_train') and not train_with_test:
+    if task in ('train', 'transfer_train', 'eval_test', ) and train_with_test==False:
+        print('Splitting data into primary and hyper set....')
         shuffle(42, train_data, train_masks)
         if use_hyp_data:
             train_data, train_masks = split(0.2, train_data, train_masks)[2:4]
@@ -136,8 +138,10 @@ def preprocess_all(train_data,
 
     # Train with test set data?
     # print(train_with_test)
-    if train_with_test:
+    # print(shuffle_seed)
+    if train_with_test==True:
         # print('aaaaaaaaaaaa')
+        print('Splitting test data ...')
         limit = int(limit)
         shuffle_seed = shuffle(shuffle_seed, test_data, test_masks)
         train_data, train_masks = test_data[:limit], test_masks[:limit]
@@ -200,14 +204,24 @@ def preprocess_all(train_data,
         input_shape = test_data.shape[1:]
 
     # Shuffle the patches
+    # print(shuffle_seed)
     if shuffle_patches and patches:
         shuffle(shuffle_seed, train_data, train_masks)
         shuffle(shuffle_seed, test_data, test_masks)
 
     # Split to train and validation sets
     val_data, val_masks, num_val, num_train, num_test = None, None, 0, 0, 0
-    #if task in ('train', 'transfer_train'):
-    train_data, train_masks, val_data, val_masks = split(val_split, train_data, train_masks)
+    if fold == -1:
+        train_data, train_masks, val_data, val_masks = split(val_split, train_data, train_masks)
+    else:
+        # cross-fold validation splitting of data, fold = 0...4
+        n_val = int(len(train_data) * val_split)
+        val_lo = fold * n_val
+        val_hi = val_lo + n_val
+        val_data = train_data[val_lo:val_hi, ...]
+        val_masks = train_masks[val_lo:val_hi, ...]
+        train_data = np.concatenate((train_data[:val_lo], train_data[val_hi:]))
+        train_masks = np.concatenate((train_masks[:val_lo], train_masks[val_hi:]))
 
     # Record number of training and validation images
     if train_data is not None:
